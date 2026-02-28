@@ -1,93 +1,176 @@
-# java-cicd-template
+# Java CI/CD 标准基础模板
 
-dd
+一个开箱即用的Java项目CI/CD标准模板，基于GitLab CI/CD设计，支持Maven构建、Docker镜像构建和Kubernetes部署。
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## 📁 目录结构
 
 ```
-cd existing_repo
-git remote add origin https://gitlab-ui.test.com/cidevops/java-cicd-template.git
-git branch -M master
-git push -uf origin master
+java-cicd-template/
+├── .gitlab-ci.yml              # 主CI配置文件
+├── ci/
+│   ├── templates/              # CI/CD模板定义
+│   │   ├── common.yml          # 通用配置模板
+│   │   ├── maven.yml           # Maven构建模板
+│   │   ├── docker.yml          # Docker镜像构建模板
+│   │   └── k8s.yml             # Kubernetes部署模板
+│   ├── docker/
+│   │   └── Dockerfile          # 标准Dockerfile
+│   └── scripts/                # 脚本目录 (预留)
+├── example/
+│   └── .gitlab-ci.yml          # 示例子项目配置
+└── README.md                   # 本文档
 ```
 
-## Integrate with your tools
+## 🚀 快速开始
 
-- [ ] [Set up project integrations](https://gitlab-ui.test.com/cidevops/java-cicd-template/-/settings/integrations)
+### 方式一: 作为子项目引入
 
-## Collaborate with your team
+在其他Java项目中创建 `.gitlab-ci.yml`:
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```yaml
+include:
+  - project: 'cidevops/java-cicd-template'
+    file: '.gitlab-ci.yml'
 
-## Test and Deploy
+variables:
+  APP_NAME: my-java-app
+  DOCKER_REGISTRY: registry.example.com
+  K8S_NAMESPACE: production
+```
 
-Use the built-in continuous integration in GitLab.
+### 方式二: 复制模板
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+将本仓库克隆到你的项目中:
 
-***
+```bash
+git clone https://gitlab-ui.test.com/cidevops/java-cicd-template.git
+# 复制必要文件到你的项目
+cp -r ci/ your-project/
+cp .gitlab-ci.yml your-project/
+```
 
-# Editing this README
+## 📝 配置说明
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 必需变量
 
-## Suggestions for a good README
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `APP_NAME` | 应用名称 | `my-java-app` |
+| `DOCKER_REGISTRY` | Docker镜像仓库地址 | `registry.example.com` |
+| `K8S_NAMESPACE` | Kubernetes命名空间 | `production` |
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+### 可选变量
 
-## Name
-Choose a self-explaining name for your project.
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `DOCKERFILE_PATH` | 自定义Dockerfile路径 | `ci/docker/Dockerfile` |
+| `MAVEN_SETTINGS` | Maven settings.xml (Base64) | 内置默认配置 |
+| `NEXUS_USERNAME` | Nexus仓库用户名 | - |
+| `NEXUS_PASSWORD` | Nexus仓库密码 | - |
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## 🔄 流水线阶段
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+| 阶段 | 说明 | 触发条件 |
+|------|------|----------|
+| **build** | Maven编译打包 | 所有分支和标签 |
+| **test** | 单元测试 | 所有分支和标签 |
+| **docker** | 构建并推送Docker镜像 | 所有分支和标签 |
+| **deploy** | 部署到Kubernetes | 手动触发 |
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## 🌿 分支策略
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+| 分支 | 构建 | 测试 | Docker | 部署 |
+|------|------|------|--------|------|
+| `develop` | ✅ | ✅ | ✅ | 手动(开发环境) |
+| `feature/*` | ✅ | ✅ | ✅ | - |
+| `master/main` | ✅ | ✅ | ✅ | 手动(生产环境) |
+| `tag` | ✅ | ✅ | ✅ | 手动(生产环境) |
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+## 📦 Docker镜像标签策略
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+| 触发源 | 镜像标签 |
+|--------|----------|
+| Tag (如 v1.0.0) | `v1.0.0`, `latest` |
+| master/main 分支 | `latest` |
+| 其他分支 | Git commit short SHA |
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## ☸️ Kubernetes部署
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### 环境映射
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+- **开发环境**: `develop` 或 `dev` 分支 → `K8S_NAMESPACE-dev`
+- **测试环境**: `develop` 分支 → `K8S_NAMESPACE-test`
+- **生产环境**: `master`/`main` 分支或 Tag → `K8S_NAMESPACE`
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 自定义K8s配置
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+你可以在项目中创建 `k8s/{env}/deployment.yml` 来覆盖默认部署配置:
 
-## License
-For open source projects, say how it is licensed.
+```
+your-project/
+├── k8s/
+│   ├── dev/
+│   │   └── deployment.yml
+│   ├── test/
+│   │   └── deployment.yml
+│   └── prod/
+│       └── deployment.yml
+└── .gitlab-ci.yml
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### 回滚操作
+
+每个环境都支持一键回滚到上一版本:
+- 在GitLab UI中点击对应环境的 "Rollback" 按钮
+
+## 🔧 高级配置
+
+### 自定义Maven构建命令
+
+```yaml
+maven_build:
+  script:
+    - mvn clean compile -B -U -Pcustom-profile
+```
+
+### 自定义测试覆盖
+
+```yaml
+maven_test:
+  script:
+    - mvn test -B -Pintegration-tests
+  coverage: '/Total.*?([0-9]{1,3})%/'
+```
+
+### 自定义部署脚本
+
+```yaml
+deploy_prod:
+  script:
+    - echo "执行自定义部署逻辑"
+    - kubectl set image deployment/${APP_NAME} ...
+```
+
+## 📋 GitLab Runner 要求
+
+确保你的GitLab Runner满足以下要求:
+
+1. **Maven构建**: 需要安装Maven或使用Docker镜像
+2. **Docker构建**: 需要配置Docker-in-Docker (dind)
+3. **Kubernetes部署**: 需要配置Kubeconfig
+
+推荐配置 `.gitlab-runner/config.toml`:
+
+```toml
+[[runners]]
+  name = "docker-runner"
+  executor = "docker"
+  [runners.docker]
+    image = "ubuntu:22.04"
+    volumes = ["/cache"]
+    privileged = true  # 需要用于Docker-in-Docker
+```
+
+## 📄 许可证
+
+MIT License

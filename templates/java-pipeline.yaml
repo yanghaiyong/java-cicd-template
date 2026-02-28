@@ -1,0 +1,89 @@
+include:
+  - project: 'cidevops/cidevops-gitlabci-service'
+    ref: master
+    file: 'jobs/package.yaml'
+  - project: 'cidevops/cidevops-gitlabci-service'
+    ref: master
+    file: 'jobs/build.yaml'
+  - project: 'cidevops/cidevops-gitlabci-service'
+    ref: master
+    file: 'jobs/test.yaml'
+  - project: 'cidevops/cidevops-gitlabci-service'
+    ref: master
+    file: 'jobs/deploy.yaml'
+
+
+variables:
+  HOSTS_COMMAND: 'echo "192.168.3.83 k8s-node-1" >> /etc/hosts'
+  CACHE_DIR: 'SpringBootCache/RedisCacheBoot/target/'
+  ARTIFACTS: 'SpringBootCache/RedisCacheBoot/target/'
+  BUILD_SHELL: 'mvn clean package -U -DskipTests -f pom.xml -s settings.xml'
+  TEST_SHELL: 'mvn test -U -f pom.xml -s settings.xml'
+  JUNIT_REPORT_PATH: 'SpringBootCache/RedisCacheBoot/target/surefire-reports/'
+  MAVEN_OPTS: "-Dmaven.repo.local=/home/maven/.m2/repository"
+  GIT_CHECKOUT: "false" # 定义是否每个阶段都拉取代码,可以在阶段的变量中设置为true表示拉取
+  DOCKERFILE_PATH: "SpringBootCache/RedisCacheBoot/src/main/docker/Dockerfile"
+  K8S_YAML: "SpringBootCache/k8s/dev/cache-redis-boot.yaml"
+  SKY_WALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.3.0-java17"
+  ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
+
+  CI_REGISTRY_USER: "admin"
+  CI_REGISTRY_PASSWORD: "admin"
+  CI_REGISTRY: "k8s-node-1:5000"
+  CI_REGISTRY_IMAGE: "cache-redis-boot"
+  CI_REGISTRY_FULL_IMAGE: "$CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" # 全路径镜像名称
+
+  #CI_COMMIT_MESSAGE
+  #CI_COMMIT_SHORT_SHA
+  #CI_COMMIT_SHA  当前提交的 SHA-1 哈希值
+  #CI_COMMIT_REF_NAME 当前提交的分支或标签名称
+  #CI_COMMIT_REF_SLUG 当前分支或标签的 slug 版本（通常用于生成文件名）
+  #CI_COMMIT_TAG 当前提交的标签名称
+  #CI_COMMIT_BRANCH 当前提交的分支名称
+  #CI_JOB_ID  当前 Job 的唯一 ID
+  #CI_BUILDS_DIR
+  #CI_PROJECT_DIR 项目的完整路径
+  #CI_PROJECT_PATH  项目的完整路径，格式为：组/项目名称
+  #CI_PROJECT_URL 项目的 URL
+
+
+cache:
+  paths:
+    - ${CACHE_DIR}
+
+stages:
+  - package
+  - test
+  - build
+  - deploy
+
+mvn_build:
+  stage: package
+  extends: .mvn_build
+  image: maven:3.9.4-sapmachine-21
+
+test:
+  stage: test
+  extends: .test
+  image: maven:3.9.4-sapmachine-21
+  needs: ["mvn_build"]
+
+docker_upload:
+  stage: build
+  extends: .docker_upload
+  image: docker:latest
+  needs: ["mvn_build"]
+
+docker_download:
+  stage: build
+  extends: .docker_download
+  image: docker:latest
+  needs: ["docker_upload"]
+
+k8s_deploy:
+  stage: deploy
+  extends: .k8s_deploy
+  image:
+    name: bitnami/kubectl:latest
+    entrypoint: [ "" ]
+  needs: ["docker_download"]

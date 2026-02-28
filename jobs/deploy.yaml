@@ -1,0 +1,24 @@
+.k8s_deploy:
+  stage: deploy
+  when: on_success
+  tags:
+    - deploy
+  only:
+    - master
+  before_script:
+    - 'echo "开始部署项目--->"'
+  script:
+    - 'pwd && ls && id'
+    - 'echo $CI_REGISTRY_FULL_IMAGE'
+    - 'sed -i "s|SKY_WALKING_AGENT_IMAGE_NAME|${SKY_WALKING_AGENT_IMAGE}|g" $K8S_YAML'
+    - 'sed -i "s|IMAGE_NAME|${CI_REGISTRY_FULL_IMAGE}|g" $K8S_YAML'
+    - 'cat $K8S_YAML'
+    - 'kubectl apply -f $K8S_YAML'
+    - 'kubectl get deployments -o wide -A| grep cache-redis-boot'
+  variables:
+    KUBECONFIG: "./SpringBootCache/etc/kubernetes/admin.conf"
+    KUBECONFIG_COMMAND: 'export KUBECONFIG=$KUBECONFIG'
+    CI_DEBUG_TRACE: "false" # true表示调试
+    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
+  cache:
+    policy: push # 不上传缓存

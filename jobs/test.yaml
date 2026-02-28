@@ -1,0 +1,18 @@
+.test:
+  dependencies:
+    - mvn_build #使用build这个job的制品
+  stage: test
+  tags:
+    - test
+  script:
+    - $TEST_SHELL
+  after_script:
+    - ls $JUNIT_REPORT_PATH
+  variables:
+    CI_DEBUG_TRACE: "false" # true表示调试
+    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
+  artifacts:
+    reports:
+      junit: ${JUNIT_REPORT_PATH}TEST-*.xml
+  cache:
+    policy: push #禁止上传到缓存
