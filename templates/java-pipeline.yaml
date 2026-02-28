@@ -1,14 +1,14 @@
 include:
-  - project: 'cidevops/cidevops-gitlabci-service'
+  - project: 'cidevops/java-cicd-template'
     ref: master
     file: 'jobs/package.yaml'
-  - project: 'cidevops/cidevops-gitlabci-service'
+  - project: 'cidevops/java-cicd-template'
     ref: master
     file: 'jobs/build.yaml'
-  - project: 'cidevops/cidevops-gitlabci-service'
+  - project: 'cidevops/java-cicd-template'
     ref: master
     file: 'jobs/test.yaml'
-  - project: 'cidevops/cidevops-gitlabci-service'
+  - project: 'cidevops/java-cicd-template'
     ref: master
     file: 'jobs/deploy.yaml'
 
