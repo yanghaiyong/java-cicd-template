@@ -11,7 +11,7 @@
     - 'echo "开始构建镜像--->"'
     - 'mkdir -p /etc/docker/certs.d/$CI_REGISTRY'
     - 'pwd && ls'
-    - 'scp certs/ca.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
+    - 'scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
   script:
     - 'pwd && ls && id && ls $CACHE_DIR'
     - 'docker build -f $DOCKERFILE_PATH --force-rm -t $CI_REGISTRY_FULL_IMAGE .'
@@ -35,7 +35,7 @@
     - 'echo "开始下载镜像--->"'
     - 'mkdir -p /etc/docker/certs.d/$CI_REGISTRY'
     - 'pwd && ls'
-    - 'scp certs/ca.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
+    - 'scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
   script:
     - 'docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY'
     - 'docker pull $CI_REGISTRY_FULL_IMAGE'
