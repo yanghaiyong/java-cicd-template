@@ -15,7 +15,7 @@
   script:
     - 'pwd && ls && id && ls $CACHE_DIR'
     - 'docker build -f $DOCKERFILE_PATH --force-rm -t $CI_REGISTRY_FULL_IMAGE .'
-    - 'docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY'
+    - 'for i in 1 2 3; do docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || sleep 2; done'
     - 'docker push $CI_REGISTRY_FULL_IMAGE'
     - 'docker rmi -f $CI_REGISTRY_FULL_IMAGE'
   variables:
@@ -37,7 +37,7 @@
     - 'pwd && ls'
     - 'scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
   script:
-    - 'docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY'
+    - 'for i in 1 2 3; do docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || sleep 2; done'
     - 'docker pull $CI_REGISTRY_FULL_IMAGE'
   after_script:
     - 'docker images'
