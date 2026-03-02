@@ -57,28 +57,28 @@ stages:
   - build
   - deploy
 
-mvn_build:
-  stage: package
-  extends: .mvn_build
-  image: maven:3.9.4-sapmachine-17
-
-test:
-  stage: test
-  extends: .test
-  image: maven:3.9.4-sapmachine-17
-  needs: ["mvn_build"]
-
-docker_upload:
-  stage: build
-  extends: .docker_upload
-  image: docker:latest
-  needs: ["mvn_build"]
-
-docker_download:
-  stage: build
-  extends: .docker_download
-  image: docker:latest
-  needs: ["docker_upload"]
+#mvn_build:
+#  stage: package
+#  extends: .mvn_build
+#  image: maven:3.9.4-sapmachine-17
+#
+#test:
+#  stage: test
+#  extends: .test
+#  image: maven:3.9.4-sapmachine-17
+#  needs: ["mvn_build"]
+#
+#docker_upload:
+#  stage: build
+#  extends: .docker_upload
+#  image: docker:latest
+#  needs: ["mvn_build"]
+#
+#docker_download:
+#  stage: build
+#  extends: .docker_download
+#  image: docker:latest
+#  needs: ["docker_upload"]
 
 k8s_deploy:
   stage: deploy
