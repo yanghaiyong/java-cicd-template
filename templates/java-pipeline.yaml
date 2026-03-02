@@ -78,7 +78,7 @@ docker_download:
   stage: build
   extends: .docker_download
   image: docker:latest
-  needs: ["docker_upload"]
+#  needs: ["docker_upload"]
 
 k8s_deploy:
   stage: deploy
