@@ -24,7 +24,7 @@ variables:
   GIT_CHECKOUT: "false" # 定义是否每个阶段都拉取代码,可以在阶段的变量中设置为true表示拉取
   DOCKERFILE_PATH: "SpringBootCache/RedisCacheBoot/src/main/docker/Dockerfile"
   K8S_YAML: "SpringBootCache/k8s/dev/cache-redis-boot.yaml"
-  SKY_WALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.3.0-java17"
+  SKY_WALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
   ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
 
   CI_REGISTRY_USER: "admin"
