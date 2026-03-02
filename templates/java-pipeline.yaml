@@ -86,4 +86,4 @@ k8s_deploy:
   image:
     name: bitnami/kubectl:latest
     entrypoint: [ "" ]
-  needs: ["docker_download"]
+#  needs: ["docker_download"]
