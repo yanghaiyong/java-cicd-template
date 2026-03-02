@@ -68,17 +68,17 @@ stages:
 #  image: maven:3.9.4-sapmachine-17
 #  needs: ["mvn_build"]
 #
-#docker_upload:
-#  stage: build
-#  extends: .docker_upload
-#  image: docker:latest
+docker_upload:
+  stage: build
+  extends: .docker_upload
+  image: docker:latest
 #  needs: ["mvn_build"]
-#
-#docker_download:
-#  stage: build
-#  extends: .docker_download
-#  image: docker:latest
-#  needs: ["docker_upload"]
+
+docker_download:
+  stage: build
+  extends: .docker_download
+  image: docker:latest
+  needs: ["docker_upload"]
 
 k8s_deploy:
   stage: deploy
