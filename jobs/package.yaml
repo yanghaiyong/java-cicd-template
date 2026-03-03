@@ -36,7 +36,7 @@
     - "echo ========================================="
     - "echo Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
     - "echo ========================================="
-
+    - "ls -lh $ARTIFACTS.jar 2>/dev/null || echo 未找到 JAR 文件"
     - "ls -la $CACHE_DIR"
   # variables 已提取到 templates/java-pipeline.yaml 统一管理
   # 构建产物管理,保存产物在ui界面，通过needs可以传递给下游job
@@ -45,7 +45,7 @@
     when: on_success
     expire_in: 30 days
     paths:
-      - ${ARTIFACTS}*.jar
+      - $ARTIFACTS*.jar
     expose_as: "构建产物"
   # Maven 本地仓库缓存策略 - 按分支隔离
   cache:
