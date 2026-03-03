@@ -31,7 +31,7 @@
     - 'echo "磁盘空间: $(df -h . | tail -1)"'
   # 执行构建
   script:
-    - '$BUILD_SHELL'
+    - $BUILD_SHELL
   # 构建后处理
   after_script:
     - 'echo "========================================="'
