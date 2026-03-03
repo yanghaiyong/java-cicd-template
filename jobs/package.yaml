@@ -23,7 +23,7 @@
   # 构建前准备
   before_script:
     - "echo ========================================="
-    - "echo Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+    - "echo Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S') 默认目录 - $HOME"
     - "echo 构建命令: $BUILD_SHELL"
     - "echo Java 版本: $(java -version 2>&1 | head -1)"
     - "echo Maven 版本: $(mvn -version 2>&1 | head -1)"
