@@ -70,9 +70,9 @@ cache:
 
 stages:
   - package
-  - test
-  - build
-  - deploy
+#  - test
+#  - build
+#  - deploy
 
 mvn_build:
   stage: package

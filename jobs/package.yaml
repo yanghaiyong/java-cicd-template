@@ -43,12 +43,7 @@
     - ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR 文件"
     # 显示缓存目录状态
     - ls -la ${CACHE_DIR}
-  variables:
-    # GitLab CI 调试模式：false=正常模式，true=详细调试
-    CI_DEBUG_TRACE: "false"
-    # 是否自动拉取代码：true=每个job开始时自动拉取最新代码
-    GIT_CHECKOUT: "true"
-  # MAVEN_OPTS, CI_DEBUG_TRACE, GIT_CHECKOUT 在模板文件中定义
+  # variables 已提取到 templates/java-pipeline.yaml 统一管理
   # 构建产物管理,保存产物在ui界面，通过needs可以传递给下游job
   artifacts:
     name: '$ARTIFACTS_NAME'
@@ -109,9 +104,7 @@
   extends: .mvn_build
   variables:
     # 增量编译优化
-    MAVEN_OPTS: > 
-      -Dmaven.repo.local=/root/.m2/repository
-      -XX:+TieredCompilation
+    MAVEN_OPTS: "-Dmaven.repo.local=/root/.m2/repository -XX:+TieredCompilation"
   script:
     # 优先尝试增量编译，失败时回退到完整构建
     - mvn compile -o -f pom.xml || $BUILD_SHELL
