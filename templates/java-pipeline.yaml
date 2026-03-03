@@ -28,7 +28,7 @@ variables:
   HOSTS_COMMAND: 'echo "192.168.3.83 k8s-node-1" >> /etc/hosts'
   CACHE_DIR: 'SpringBootCache/RedisCacheBoot/target/'
   ARTIFACTS: 'SpringBootCache/RedisCacheBoot/target/'
-  BUILD_SHELL: 'mvn clean package -B -U -DskipTests -f pom.xml -s settings.xml'
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml' # 'mvn clean package -B -U -DskipTests -f pom.xml -s settings.xml'
   TEST_SHELL: 'mvn test -B -U -f pom.xml -s settings.xml'
   JUNIT_REPORT_PATH: 'SpringBootCache/RedisCacheBoot/target/surefire-reports/'
   
