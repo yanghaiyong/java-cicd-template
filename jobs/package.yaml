@@ -36,8 +36,8 @@
     - "echo ========================================="
     - "echo Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
     - "echo ========================================="
-    - "ls -lh ${ARTIFACTS}redis-cache.jar 2>/dev/null || echo 未找到 JAR 文件"
-    - "ls -la ${CACHE_DIR}"
+    - "ls -lh $ARTIFACTS.jar 2>/dev/null || echo 未找到 JAR 文件"
+    - "ls -la $CACHE_DIR"
   # variables 已提取到 templates/java-pipeline.yaml 统一管理
   # 构建产物管理,保存产物在ui界面，通过needs可以传递给下游job
   artifacts:
