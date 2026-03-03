@@ -17,11 +17,17 @@
     when:
       - runner_system_failure
       - stuck_or_timeout_failure
-      - network_failure
   # 构建前准备
   before_script:
-    - 'echo "========================================="'
-
+    - echo "========================================="
+    - echo "Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+    - echo "构建命令: $BUILD_SHELL"
+    - echo "Java 版本: $(java -version 2>&1 | head -1)"
+    - echo "Maven 版本: $(mvn -version 2>&1 | head -1)"
+    - echo "========================================="
+    - mkdir -p ~/.m2/repository
+    - echo "工作目录: $(pwd)"
+    - echo "磁盘空间: $(df -h . | tail -1)"
   # 执行构建
   script:
     - $BUILD_SHELL
