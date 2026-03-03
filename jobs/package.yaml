@@ -55,7 +55,7 @@
     policy: pull-push # 默认逻辑job开始之前下载,job结束上传；push:不下载只上传；pull:只下载
     key: "maven-${CI_COMMIT_REF_SLUG}"
     paths:
-      - ~/.m2/repository # Maven 依赖（第三方 JAR）
+      - ${HOME}/.m2/repository # Maven 依赖（第三方 JAR）
       - ${CACHE_DIR}     # 构建产物（编译后的 class/jar）
 
 # ============================================
