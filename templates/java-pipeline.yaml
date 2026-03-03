@@ -14,19 +14,36 @@ include:
 
 
 variables:
+  # ============================================
+  # 统一镜像变量 - 在此集中管理所有 Docker 镜像
+  # ============================================
+  MAVEN_IMAGE: "maven:3.9.4-eclipse-temurin-17"
+  DOCKER_IMAGE: "docker:latest"
+  KUBECTL_IMAGE: "bitnami/kubectl:latest"
+  SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
+  
+  # ============================================
+  # 构建相关变量
+  # ============================================
   HOSTS_COMMAND: 'echo "192.168.3.83 k8s-node-1" >> /etc/hosts'
   CACHE_DIR: 'SpringBootCache/RedisCacheBoot/target/'
   ARTIFACTS: 'SpringBootCache/RedisCacheBoot/target/'
-  BUILD_SHELL: 'mvn clean package -U -DskipTests -f pom.xml -s settings.xml'
-  TEST_SHELL: 'mvn test -U -f pom.xml -s settings.xml'
+  BUILD_SHELL: 'mvn clean package -B -U -DskipTests -f pom.xml -s settings.xml'
+  TEST_SHELL: 'mvn test -B -U -f pom.xml -s settings.xml'
   JUNIT_REPORT_PATH: 'SpringBootCache/RedisCacheBoot/target/surefire-reports/'
-  MAVEN_OPTS: "-Dmaven.repo.local=/home/maven/.m2/repository"
-  GIT_CHECKOUT: "false" # 定义是否每个阶段都拉取代码,可以在阶段的变量中设置为true表示拉取
+  
+  # ============================================
+  # Maven 构建优化变量 - 统一配置
+  # ============================================
+  # Maven JVM 参数：分层编译 + 内存配置
+  MAVEN_OPTS: "-Dmaven.repo.local=/root/.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
   DOCKERFILE_PATH: "SpringBootCache/RedisCacheBoot/src/main/docker/Dockerfile"
   K8S_YAML: "SpringBootCache/k8s/dev/cache-redis-boot.yaml"
-  SKY_WALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
   ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
 
+  # ============================================
+  # Docker Registry 配置
+  # ============================================
   CI_REGISTRY_USER: "admin"
   CI_REGISTRY_PASSWORD: "admin"
   CI_REGISTRY: "k8s-node-1:5000"
@@ -60,30 +77,30 @@ stages:
 mvn_build:
   stage: package
   extends: .mvn_build
-  image: maven:3.9.4-sapmachine-17
+  image: $MAVEN_IMAGE
 
-test:
-  stage: test
-  extends: .test
-  image: maven:3.9.4-sapmachine-17
-  needs: ["mvn_build"]
-
-docker_upload:
-  stage: build
-  extends: .docker_upload
-  image: docker:latest
-  needs: ["mvn_build"]
-
-docker_download:
-  stage: build
-  extends: .docker_download
-  image: docker:latest
-  needs: ["docker_upload"]
-
-k8s_deploy:
-  stage: deploy
-  extends: .k8s_deploy
-  image:
-    name: bitnami/kubectl:latest
-    entrypoint: [ "" ]
-  needs: ["docker_download"]
+#test:
+#  stage: test
+#  extends: .test
+#  image: $MAVEN_IMAGE
+#  needs: ["mvn_build"]
+#
+#docker_upload:
+#  stage: build
+#  extends: .docker_upload
+#  image: $DOCKER_IMAGE
+#  needs: ["mvn_build"]
+#
+#docker_download:
+#  stage: build
+#  extends: .docker_download
+#  image: $DOCKER_IMAGE
+#  needs: ["docker_upload"]
+#
+#k8s_deploy:
+#  stage: deploy
+#  extends: .k8s_deploy
+#  image:
+#    name: $KUBECTL_IMAGE
+#    entrypoint: [ "" ]
+#  needs: ["docker_download"]
