@@ -19,25 +19,25 @@
       - stuck_or_timeout_failure
   # 构建前准备
   before_script:
-    - echo "========================================="
-    - echo "Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
-    - echo "构建命令: $BUILD_SHELL"
-    - echo "Java 版本: $(java -version 2>&1 | head -1)"
-    - echo "Maven 版本: $(mvn -version 2>&1 | head -1)"
-    - echo "========================================="
-    - mkdir -p ~/.m2/repository
-    - echo "工作目录: $(pwd)"
-    - echo "磁盘空间: $(df -h . | tail -1)"
+    - "echo ========================================="
+    - "echo Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+    - "echo 构建命令: $BUILD_SHELL"
+    - "echo Java 版本: $(java -version 2>&1 | head -1)"
+    - "echo Maven 版本: $(mvn -version 2>&1 | head -1)"
+    - "echo ========================================="
+    - "mkdir -p ~/.m2/repository"
+    - "echo 工作目录: $(pwd)"
+    - "echo 磁盘空间: $(df -h . | tail -1)"
   # 执行构建
   script:
-    - $BUILD_SHELL
+    - "$BUILD_SHELL"
   # 构建后处理
   after_script:
-    - echo "========================================="
-    - echo "Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
-    - echo "========================================="
-    - ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR 文件"
-    - ls -la ${CACHE_DIR}
+    - "echo ========================================="
+    - "echo Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+    - "echo ========================================="
+    - "ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo 未找到 JAR 文件"
+    - "ls -la ${CACHE_DIR}"
   # variables 已提取到 templates/java-pipeline.yaml 统一管理
   # 构建产物管理,保存产物在ui界面，通过needs可以传递给下游job
   artifacts:
@@ -76,11 +76,11 @@
 #    - tags
 #  # 添加发布前检查
 #  before_script:
-#    - echo "========================================="
-#    - echo "发布构建模式 - $(date +'%Y-%m-%d %H:%M:%S')"
-#    - echo "Tag: $CI_COMMIT_TAG"
-#    - echo "Commit: $CI_COMMIT_SHA"
-#    - echo "========================================="
+#    - "echo ========================================="
+#    - "echo 发布构建模式 - $(date +'%Y-%m-%d %H:%M:%S')"
+#    - "echo Tag: $CI_COMMIT_TAG"
+#    - "echo Commit: $CI_COMMIT_SHA"
+#    - "echo ========================================="
 #  script:
 #    # 使用 release profile 构建
 #    - mvn clean package -U -DskipTests -f pom.xml -Prelease
@@ -112,10 +112,10 @@
 #  tags:
 #    - package
 #  script:
-#    - 'id && printenv'
+#    - "id && printenv"
 #    - "$BUILD_SHELL"
 #  after_script:
-#    - 'ls ${CACHE_DIR}'
+#    - "ls ${CACHE_DIR}"
 #  variables:
 #    CI_DEBUG_TRACE: "false" # true表示调试
 #    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
