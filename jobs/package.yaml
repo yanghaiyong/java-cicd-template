@@ -17,6 +17,9 @@
     when:
       - runner_system_failure
       - stuck_or_timeout_failure
+  variables:
+    CI_DEBUG_TRACE: "false" # true表示调试
+    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
   # 构建前准备
   before_script:
     - "echo ========================================="
