@@ -36,7 +36,7 @@ variables:
   # Maven 构建优化变量 - 统一配置
   # ============================================
   # Maven JVM 参数：分层编译 + 内存配置
-  MAVEN_OPTS: "-Dmaven.repo.local=/root/.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
   DOCKERFILE_PATH: "SpringBootCache/RedisCacheBoot/src/main/docker/Dockerfile"
   K8S_YAML: "SpringBootCache/k8s/dev/cache-redis-boot.yaml"
   ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'

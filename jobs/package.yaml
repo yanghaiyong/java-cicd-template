@@ -19,7 +19,7 @@
       - stuck_or_timeout_failure
   variables:
     CI_DEBUG_TRACE: "false" # true表示调试
-    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
+    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可，工作目录 = 项目根目录（如 /builds/用户名/项目名/）
   # 构建前准备
   before_script:
     - "echo ========================================="
@@ -28,7 +28,7 @@
     - "echo Java 版本: $(java -version 2>&1 | head -1)"
     - "echo Maven 版本: $(mvn -version 2>&1 | head -1)"
     - "echo ========================================="
-    - "mkdir -p /root/.m2/repository"
+    - "mkdir -p .m2/repository"
     - "echo 工作目录: $(pwd)"
     - "echo 磁盘空间: $(df -h . | tail -1)"
   # 执行构建
@@ -55,7 +55,7 @@
     policy: pull-push # 默认逻辑job开始之前下载,job结束上传；push:不下载只上传；pull:只下载
     key: "maven-${CI_COMMIT_REF_SLUG}"
     paths:
-      - /root/.m2/repository # Maven 依赖（第三方 JAR）
+      - .m2/repository # Maven 依赖（第三方 JAR）
       - ${CACHE_DIR}     # 构建产物（编译后的 class/jar）
 
 # ============================================
