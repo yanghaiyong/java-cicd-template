@@ -28,7 +28,7 @@
     - "echo Java 版本: $(java -version 2>&1 | head -1)"
     - "echo Maven 版本: $(mvn -version 2>&1 | head -1)"
     - "echo ========================================="
-    - "mkdir -p ~/.m2/repository"
+    - "mkdir -p $HOME/.m2/repository"
     - "echo 工作目录: $(pwd)"
     - "echo 磁盘空间: $(df -h . | tail -1)"
   # 执行构建
