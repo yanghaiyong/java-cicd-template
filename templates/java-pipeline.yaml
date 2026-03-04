@@ -71,7 +71,7 @@ cache:
 stages:
   - package
 #  - test
-#  - build
+  - build
 #  - deploy
 
 mvn_build:
