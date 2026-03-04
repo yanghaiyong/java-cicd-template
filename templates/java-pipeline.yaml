@@ -29,7 +29,7 @@ variables:
   ARTIFACTS: 'SpringBootCache/RedisCacheBoot/target/'
   BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml' # 'mvn clean package -B -U -DskipTests -f pom.xml -s settings.xml'
   TEST_SHELL: 'mvn test -B -U -f pom.xml -s settings.xml'
-  JUNIT_REPORT_PATH: 'SpringBootCache/RedisCacheBoot/target/surefire-reports/'
+  JUNIT_REPORT_PATH: 'target/surefire-reports/'
   
   # ============================================
   # Maven 构建优化变量 - 统一配置
