@@ -99,6 +99,9 @@
       echo "开始推送镜像..."
       docker push $CI_REGISTRY_FULL_IMAGE
       echo "镜像推送成功"
+      echo "========================================="
+      echo "构建成功！镜像地址: $CI_REGISTRY_FULL_IMAGE"
+      echo "========================================="
       
       # 清理本地镜像（释放空间）
       echo "清理本地镜像..."
