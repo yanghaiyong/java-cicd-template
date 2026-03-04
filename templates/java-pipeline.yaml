@@ -72,7 +72,7 @@ stages:
   - package
 #  - test
   - build
-#  - deploy
+  - deploy
 
 mvn_build:
   stage: package
@@ -97,10 +97,10 @@ docker_upload:
 #  image: $DOCKER_IMAGE
 #  needs: ["docker_upload"]
 #
-#k8s_deploy:
-#  stage: deploy
-#  extends: .k8s_deploy
-#  image:
-#    name: $KUBECTL_IMAGE
-#    entrypoint: [ "" ]
-#  needs: ["docker_download"]
+k8s_deploy:
+  stage: deploy
+  extends: .k8s_deploy
+  image:
+    name: $KUBECTL_IMAGE
+    entrypoint: [ "" ]
+  needs: ["docker_download"]

@@ -1,3 +1,10 @@
+# ============================================
+# Kubernetes 部署模板 - 生产环境标准配置
+# ============================================
+# 版本: 2.0
+# ============================================
+
+# Kubernetes 部署基础模板
 .k8s_deploy:
   stage: deploy
   when: on_success
@@ -5,20 +12,83 @@
     - deploy
   only:
     - master
-  before_script:
-    - 'echo "开始部署项目--->"'
-  script:
-    - 'pwd && ls && id'
-    - 'echo $CI_REGISTRY_FULL_IMAGE'
-    - 'sed -i "s|SKY_WALKING_AGENT_IMAGE_NAME|${SKY_WALKING_AGENT_IMAGE}|g" $K8S_YAML'
-    - 'sed -i "s|IMAGE_NAME|${CI_REGISTRY_FULL_IMAGE}|g" $K8S_YAML'
-    - 'cat $K8S_YAML'
-    - 'kubectl apply -f $K8S_YAML'
-    - 'kubectl get deployments -o wide -A| grep cache-redis-boot'
+  # 自动化重试机制
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
   variables:
-    KUBECONFIG: "./SpringBootCache/etc/kubernetes/admin.conf"
-    KUBECONFIG_COMMAND: 'export KUBECONFIG=$KUBECONFIG'
-    CI_DEBUG_TRACE: "false" # true表示调试
-    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
+    CI_DEBUG_TRACE: "false"
+    GIT_CHECKOUT: "true"
+  # 部署前准备
+  before_script:
+    - |
+      echo "========================================="
+      echo "Kubernetes 部署开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      echo "K8s 配置文件: $KUBECONFIG"
+      echo "K8s 部署文件: $K8S_YAML"
+      kubectl version --client
+      echo "========================================="
+  # 执行部署
+  script:
+    - |
+      echo "========================================="
+      echo "开始部署应用"
+      echo "========================================="
+      
+      # 确定镜像标签策略（与 build.yaml 保持一致）
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+        echo "使用 Tag: $IMAGE_TAG"
+      elif [ "$CI_COMMIT_BRANCH" = "master" ] || [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        IMAGE_TAG="latest"
+        echo "分支部署 - 使用 latest 标签"
+      else
+        IMAGE_TAG=$CI_COMMIT_SHORT_SHA
+        echo "特性分支部署 - 使用短 SHA 标签"
+      fi
+      
+      # 动态生成镜像名称
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+      echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
+      echo "========================================="
+      
+      # 替换镜像地址（合并 sed 命令）
+      sed -i \
+        -e "s|SKY_WALKING_AGENT_IMAGE_NAME|${SKY_WALKING_AGENT_IMAGE}|g" \
+        -e "s|IMAGE_NAME|${CI_REGISTRY_FULL_IMAGE}|g" \
+        $K8S_YAML
+      
+      echo "部署配置文件:"
+      cat $K8S_YAML
+      echo "========================================="
+      
+      # 部署应用
+      echo "开始部署..."
+      if kubectl apply -f $K8S_YAML; then
+        echo "部署成功"
+      else
+        echo "========================================="
+        echo "部署失败！"
+        echo "========================================="
+        exit 1
+      fi
+      
+      # 验证部署结果
+      echo "========================================="
+      echo "部署完成！"
+      echo "========================================="
+      kubectl get deployments -n ${K8S_NAMESPACE}
+      kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME}
+      
+      echo "部署任务完成"
+  # 部署后处理
+  after_script:
+    - |
+      echo "========================================="
+      echo "Kubernetes 部署完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
   cache:
-    policy: push # 不上传缓存
+    policy: push
