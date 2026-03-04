@@ -22,14 +22,13 @@
     CI_DEBUG_TRACE: "false"
     GIT_CHECKOUT: "true"
     KUBECONFIG: /tmp/kubeconfig
-    KUBECONFIG_CONTENT: ""  # 在 GitLab CI 变量中配置
   # 部署前准备
   before_script:
     - |
       echo "========================================="
       echo "Kubernetes 部署开始 - $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
-      # 将 kubeconfig 内容写入临时文件
+      # 将 kubeconfig 内容写入临时文件，# KUBECONFIG_CONTENT这里会自动读取 GitLab CI 变量
       if [ -n "$KUBECONFIG_CONTENT" ]; then
         echo "$KUBECONFIG_CONTENT" > ${KUBECONFIG}
         chmod 600 ${KUBECONFIG}
