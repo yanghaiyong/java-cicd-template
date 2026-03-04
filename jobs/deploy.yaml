@@ -21,12 +21,23 @@
   variables:
     CI_DEBUG_TRACE: "false"
     GIT_CHECKOUT: "true"
+    KUBECONFIG: /tmp/kubeconfig
+    KUBECONFIG_CONTENT: ""  # 在 GitLab CI 变量中配置
   # 部署前准备
   before_script:
     - |
       echo "========================================="
       echo "Kubernetes 部署开始 - $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
+      # 将 kubeconfig 内容写入临时文件
+      if [ -n "$KUBECONFIG_CONTENT" ]; then
+        echo "$KUBECONFIG_CONTENT" > ${KUBECONFIG}
+        chmod 600 ${KUBECONFIG}
+        echo "Kubeconfig 配置完成"
+      else
+        echo "错误: KUBECONFIG_CONTENT 变量未配置"
+        exit 1
+      fi
       echo "K8s 配置文件: $KUBECONFIG"
       echo "K8s 部署文件: $K8S_YAML"
       kubectl version --client
