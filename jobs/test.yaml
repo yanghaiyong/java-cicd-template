@@ -37,8 +37,8 @@
       echo "开始执行测试"
       echo "========================================="
       
-      # 执行测试
-      $TEST_SHELL
+      # 执行测试（包含 JaCoCo 覆盖率）
+      mvn test jacoco:report -B -U -f pom.xml -s settings.xml
       TEST_RESULT=$?
       
       echo "========================================="
@@ -62,13 +62,14 @@
   artifacts:
     reports:
       junit: ${JUNIT_REPORT_PATH}TEST-*.xml
-    coverage_report:  # 添加这行
-      coverage_format: jacoco
-      path: target/site/jacoco/jacoco.xml
+      coverage_report:
+        coverage_format: jacoco
+        path: target/site/jacoco/jacoco.xml
     when: always
     expire_in: 7 days
     paths:
       - ${JUNIT_REPORT_PATH}
+      - target/site/jacoco/
   # Maven 缓存策略
   cache:
     policy: pull-push
