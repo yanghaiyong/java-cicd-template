@@ -25,7 +25,6 @@ variables:
   # ============================================
   # 构建相关变量
   # ============================================
-  HOSTS_COMMAND: 'echo "192.168.3.83 k8s-node-1" >> /etc/hosts'
   CACHE_DIR: 'SpringBootCache/RedisCacheBoot/target/'
   ARTIFACTS: 'SpringBootCache/RedisCacheBoot/target/'
   BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml' # 'mvn clean package -B -U -DskipTests -f pom.xml -s settings.xml'
@@ -76,7 +75,7 @@ cache:
 
 stages:
   - package
-#  - test
+  - test
   - build
   - deploy
 
@@ -85,24 +84,18 @@ mvn_build:
   extends: .mvn_build
   image: $MAVEN_IMAGE
 
-#test:
-#  stage: test
-#  extends: .test
-#  image: $MAVEN_IMAGE
-#  needs: ["mvn_build"]
-#
+test:
+  stage: test
+  extends: .test
+  image: $MAVEN_IMAGE
+  needs: ["mvn_build"]
+
 docker_upload:
   stage: build
   extends: .docker_upload
   image: $DOCKER_IMAGE
   needs: ["mvn_build"]
-#
-#docker_download:
-#  stage: build
-#  extends: .docker_download
-#  image: $DOCKER_IMAGE
-#  needs: ["docker_upload"]
-#
+
 k8s_deploy:
   stage: deploy
   extends: .k8s_deploy
