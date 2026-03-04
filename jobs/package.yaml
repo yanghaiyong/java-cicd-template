@@ -22,25 +22,29 @@
     GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可，工作目录 = 项目根目录（如 /builds/用户名/项目名/）
   # 构建前准备
   before_script:
-    - "echo ========================================="
-    - "echo Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S') 默认目录 - $HOME"
-    - "echo 构建命令: $BUILD_SHELL"
-    - "echo Java 版本: $(java -version 2>&1 | head -1)"
-    - "echo Maven 版本: $(mvn -version 2>&1 | head -1)"
-    - "echo ========================================="
-    - "mkdir -p .m2/repository"
-    - "echo 工作目录: $(pwd)"
-    - "echo 磁盘空间: $(df -h . | tail -1)"
+    - |
+      echo "========================================="
+      echo "Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "默认目录: $HOME"
+      echo "========================================="
+      echo "构建命令: $BUILD_SHELL"
+      echo "Java 版本: $(java -version 2>&1 | head -1)"
+      echo "Maven 版本: $(mvn -version 2>&1 | head -1)"
+      mkdir -p .m2/repository
+      echo "工作目录: $(pwd)"
+      echo "磁盘空间: $(df -h . | tail -1)"
   # 执行构建
   script:
-    - "$BUILD_SHELL"
+    - |
+      $BUILD_SHELL
   # 构建后处理
   after_script:
-    - "echo ========================================="
-    - "echo Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
-    - "echo ========================================="
-    - "ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo 未找到 JAR 文件"
-    - "ls -la $CACHE_DIR"
+    - |
+      echo "========================================="
+      echo "Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR 文件"
+      ls -la $CACHE_DIR
   # variables 已提取到 templates/java-pipeline.yaml 统一管理
   # 构建产物管理,保存产物在ui界面，通过needs可以传递给下游job
   artifacts:
@@ -106,30 +110,3 @@
 #  script:
 #    # 优先尝试增量编译，失败时回退到完整构建
 #    - mvn compile -o -f pom.xml || "$BUILD_SHELL"
-
-
-# 初版本1.0
-#.mvn_build:
-#  dependencies: [] # 不会下载之前阶段的任何工件
-#  stage: package
-#  tags:
-#    - package
-#  script:
-#    - "id && printenv"
-#    - "$BUILD_SHELL"
-#  after_script:
-#    - "ls ${CACHE_DIR}"
-#  variables:
-#    CI_DEBUG_TRACE: "false" # true表示调试
-#    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
-#  artifacts:
-#    name: '$ARTIFACTS_NAME'
-#    when: on_success
-#    expire_in: 30 days
-#    paths:
-#      - ${ARTIFACTS}*.jar
-#  cache:
-#    policy: push # pull和push的含义是反着的，当策略为pull时意味着当前job开始的时候不会下载缓存,push则表示job结束时不会上传,默认是pull-push
-#    key: package
-#    paths:
-#      - ${CACHE_DIR}

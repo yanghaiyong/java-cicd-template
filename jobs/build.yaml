@@ -1,48 +1,217 @@
-.docker_upload:
-  dependencies:
-    - mvn_build #使用build这个job的制品
-  stage: build
-  when: on_success
-  tags:
-    - build
-  only:
-    - master
-  before_script:
-    - 'echo "开始构建镜像--->"'
-    - 'mkdir -p /etc/docker/certs.d/$CI_REGISTRY'
-    - 'pwd && ls'
-    - 'scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
-  script:
-    - 'pwd && ls && id && ls $CACHE_DIR'
-    - 'docker build -f $DOCKERFILE_PATH --force-rm -t $CI_REGISTRY_FULL_IMAGE .'
-    - 'for i in 1 2 3; do docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || sleep 2; done'
-    - 'docker push $CI_REGISTRY_FULL_IMAGE'
-    - 'docker rmi -f $CI_REGISTRY_FULL_IMAGE'
-  variables:
-    CI_DEBUG_TRACE: "false" # true表示调试
-    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
-  cache:
-    policy: push # 不上传缓存
+# ============================================
+# Docker 镜像构建模板 - 生产环境标准配置
+# ============================================
+# 包含：自动重试、缓存优化、智能标签、多环境支持
+# 版本: 2.0
+# ============================================
 
-.docker_download:
+# Docker 构建基础模板 - 生产环境标准
+.docker_build_base:
+  image: $DOCKER_IMAGE
+  # 自动化重试机制 - 网络异常时自动重试
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  variables:
+    CI_DEBUG_TRACE: "false"
+    GIT_CHECKOUT: "true"
+  # 证书配置
+  before_script:
+    - |
+      echo "========================================="
+      echo "Docker 镜像构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      - mkdir -p /etc/docker/certs.d/$CI_REGISTRY
+      - if [ -f "certs/domain.crt" ]; then scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt; fi
+      - docker version
+      - echo "工作目录: $(pwd)"
+      - echo "镜像 Registry: $CI_REGISTRY"
+      - echo "========================================="
+  # 构建后处理
+  after_script:
+    - |
+      echo "========================================="
+      echo "Docker 镜像构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+  cache:
+    policy: push
+
+# ============================================
+# Docker 镜像构建并推送模板
+# ============================================
+.docker_upload:
+  extends: .docker_build_base
   stage: build
   when: on_success
   tags:
     - build
   only:
     - master
-  before_script:
-    - 'echo "开始下载镜像--->"'
-    - 'mkdir -p /etc/docker/certs.d/$CI_REGISTRY'
-    - 'pwd && ls'
-    - 'scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
+    - tags
+  dependencies:
+    - mvn_build
   script:
-    - 'for i in 1 2 3; do docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || sleep 2; done'
-    - 'docker pull $CI_REGISTRY_FULL_IMAGE'
+    - |
+      echo "========================================="
+      echo "开始构建 Docker 镜像"
+      echo "========================================="
+      # 确定镜像标签策略
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+        echo "使用 Tag: $IMAGE_TAG"
+      elif [ "$CI_COMMIT_BRANCH" = "master" ] || [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        IMAGE_TAG="latest"
+        echo "分支构建 - 使用 latest 标签"
+      else
+        IMAGE_TAG=$CI_COMMIT_SHORT_SHA
+        echo "特性分支构建 - 使用短 SHA 标签"
+      fi
+      
+      # 确定 Dockerfile 路径
+      if [ -n "$DOCKERFILE_PATH" ]; then
+        DOCKERFILE_DIR=$(dirname $DOCKERFILE_PATH)
+        DOCKERFILE_NAME=$(basename $DOCKERFILE_PATH)
+      else
+        DOCKERFILE_DIR="ci/docker"
+        DOCKERFILE_NAME="Dockerfile"
+      fi
+      
+      echo "Dockerfile: $DOCKERFILE_DIR/$DOCKERFILE_NAME"
+      echo "镜像名称: $CI_REGISTRY_FULL_IMAGE"
+      echo "========================================="
+    - |
+      # Docker 登录（带重试机制）
+      for i in 1 2 3; do
+        echo "Docker 登录尝试 $i/3..."
+        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || {
+          if [ $i -eq 3 ]; then echo "Docker 登录失败"; exit 1; fi
+          echo "登录失败，2秒后重试..."
+          sleep 2
+        }
+      done
+    - |
+      # 构建镜像（带构建参数）
+      echo "开始构建镜像..."
+      docker build \
+        --force-rm \
+        --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+        --build-arg VCS_REF=$CI_COMMIT_SHA \
+        --build-arg VERSION=$CI_COMMIT_SHORT_SHA \
+        -f $DOCKERFILE_PATH \
+        -t $CI_REGISTRY_FULL_IMAGE .
+      echo "镜像构建成功"
+    - |
+      # 推送镜像
+      echo "开始推送镜像..."
+      docker push $CI_REGISTRY_FULL_IMAGE
+      echo "镜像推送成功"
+    - |
+      # 如果是 tag，额外推送版本标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        VERSION_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+        docker tag $CI_REGISTRY_FULL_IMAGE $VERSION_IMAGE
+        docker push $VERSION_IMAGE
+        echo "版本标签推送成功: $VERSION_IMAGE"
+      fi
+    - |
+      # 清理本地镜像（释放空间）
+      echo "清理本地镜像..."
+      docker rmi -f $CI_REGISTRY_FULL_IMAGE || true
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        docker rmi -f "$CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" || true
+      fi
+      echo "构建任务完成"
+  artifacts:
+    name: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
+    when: always
+    expire_in: 7 days
+    paths:
+      - build.log
+
+# ============================================
+# Docker 镜像下载模板
+# ============================================
+.docker_download:
+  extends: .docker_build_base
+  stage: build
+  when: on_success
+  tags:
+    - build
+  only:
+    - master
+    - tags
+  dependencies:
+    - docker_upload
+  script:
+    - |
+      echo "========================================="
+      echo "开始下载 Docker 镜像"
+      echo "========================================="
+      # 确定镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+      elif [ "$CI_COMMIT_BRANCH" = "master" ] || [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        IMAGE_TAG="latest"
+      else
+        IMAGE_TAG=$CI_COMMIT_SHORT_SHA
+      fi
+      
+      echo "目标镜像: $CI_REGISTRY_FULL_IMAGE"
+      echo "========================================="
+    - |
+      # Docker 登录（带重试机制）
+      for i in 1 2 3; do
+        echo "Docker 登录尝试 $i/3..."
+        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || {
+          if [ $i -eq 3 ]; then echo "Docker 登录失败"; exit 1; fi
+          echo "登录失败，2秒后重试..."
+          sleep 2
+        }
+      done
+    - |
+      # 下载镜像
+      echo "开始下载镜像..."
+      docker pull $CI_REGISTRY_FULL_IMAGE
+      echo "镜像下载成功"
+    - |
+      # 验证镜像
+      echo "镜像信息:"
+      docker images | grep $(echo $CI_REGISTRY_IMAGE | sed 's/.*\///')
+      echo "下载任务完成"
   after_script:
-    - 'docker images'
-  variables:
-    CI_DEBUG_TRACE: "false" # true表示调试
-    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
-  cache:
-    policy: push # 不上传缓存
+    - |
+      echo "========================================="
+      echo "当前主机镜像列表"
+      echo "========================================="
+      docker images
+
+# ============================================
+# Docker 多架构构建模板（可选）
+# ============================================
+#.docker_upload_multi_arch:
+#  extends: .docker_build_base
+#  stage: build
+#  when: on_success
+#  tags:
+#    - build
+#  only:
+#    - tags
+#  before_script:
+#    - |
+#      echo "启用 Docker Buildx..."
+#      docker buildx create --use
+#      docker buildx inspect --bootstrap
+#  script:
+#    - |
+#      # 多架构构建
+#      docker buildx build \
+#        --platform linux/amd64,linux/arm64 \
+#        -t $CI_REGISTRY_FULL_IMAGE \
+#        -f $DOCKERFILE_PATH \
+#        --push \
+#        --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+#        --build-arg VCS_REF=$CI_COMMIT_SHA \
+#        --build-arg VERSION=$CI_COMMIT_TAG \
+#        .

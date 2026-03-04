@@ -1,0 +1,48 @@
+.docker_upload:
+  dependencies:
+    - mvn_build #使用build这个job的制品
+  stage: build
+  when: on_success
+  tags:
+    - build
+  only:
+    - master
+  before_script:
+    - 'echo "开始构建镜像--->"'
+    - 'mkdir -p /etc/docker/certs.d/$CI_REGISTRY'
+    - 'pwd && ls'
+    - 'scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
+  script:
+    - 'pwd && ls && id && ls $CACHE_DIR'
+    - 'docker build -f $DOCKERFILE_PATH --force-rm -t $CI_REGISTRY_FULL_IMAGE .'
+    - 'for i in 1 2 3; do docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || sleep 2; done'
+    - 'docker push $CI_REGISTRY_FULL_IMAGE'
+    - 'docker rmi -f $CI_REGISTRY_FULL_IMAGE'
+  variables:
+    CI_DEBUG_TRACE: "false" # true表示调试
+    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
+  cache:
+    policy: push # 不上传缓存
+
+.docker_download:
+  stage: build
+  when: on_success
+  tags:
+    - build
+  only:
+    - master
+  before_script:
+    - 'echo "开始下载镜像--->"'
+    - 'mkdir -p /etc/docker/certs.d/$CI_REGISTRY'
+    - 'pwd && ls'
+    - 'scp certs/domain.crt /etc/docker/certs.d/$CI_REGISTRY/ca.crt'
+  script:
+    - 'for i in 1 2 3; do docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || sleep 2; done'
+    - 'docker pull $CI_REGISTRY_FULL_IMAGE'
+  after_script:
+    - 'docker images'
+  variables:
+    CI_DEBUG_TRACE: "false" # true表示调试
+    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可
+  cache:
+    policy: push # 不上传缓存
