@@ -18,7 +18,7 @@ variables:
   # 统一镜像变量 - 在此集中管理所有 Docker 镜像
   # ============================================
   MAVEN_IMAGE: "maven:3.9.4-eclipse-temurin-17"
-  DOCKER_IMAGE: "docker:latest"
+  DOCKER_IMAGE: "docker:cli"
   KUBECTL_IMAGE: "bitnami/kubectl:latest"
   SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
   
