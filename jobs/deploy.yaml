@@ -89,19 +89,16 @@
       fi
       echo "========================================="
       
-      # 替换镜像地址（合并 sed 命令）
-      sed -i \
-        -e "s#SKY_WALKING_AGENT_IMAGE_NAME#${SKY_WALKING_AGENT_IMAGE}#g" \
-        -e "s#IMAGE_NAME#${CI_REGISTRY_FULL_IMAGE}#g" \
-        $K8S_YAML
-      
-      echo "部署配置文件:"
-      cat $K8S_YAML
+      # 使用 kubectl set image 更新镜像
       echo "========================================="
-      
-      # 部署应用
       echo "开始部署..."
-      if kubectl apply -f $K8S_YAML; then
+      echo "更新 Deployment 镜像..."
+      kubectl set image deployment/${APP_NAME} \
+        ${APP_NAME}=${CI_REGISTRY_FULL_IMAGE} \
+        agent-container=${SKYWALKING_AGENT_IMAGE} \
+        -n ${K8S_NAMESPACE}
+      
+      if [ $? -eq 0 ]; then
         echo "部署成功"
       else
         echo "========================================="
