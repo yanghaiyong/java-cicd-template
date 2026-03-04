@@ -85,11 +85,11 @@ mvn_build:
 #  image: $MAVEN_IMAGE
 #  needs: ["mvn_build"]
 #
-#docker_upload:
-#  stage: build
-#  extends: .docker_upload
-#  image: $DOCKER_IMAGE
-#  needs: ["mvn_build"]
+docker_upload:
+  stage: build
+  extends: .docker_upload
+  image: $DOCKER_IMAGE
+  needs: ["mvn_build"]
 #
 #docker_download:
 #  stage: build
