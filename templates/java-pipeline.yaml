@@ -103,4 +103,4 @@ k8s_deploy:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  needs: ["docker_download"]
+  needs: ["docker_upload"]
