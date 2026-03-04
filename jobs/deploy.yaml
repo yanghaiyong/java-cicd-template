@@ -55,6 +55,30 @@
       echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
       echo "========================================="
       
+      # 检查文件是否存在
+      echo "检查配置文件..."
+      if [ ! -f "$KUBECONFIG" ]; then
+        echo "错误: KUBECONFIG 文件不存在: $KUBECONFIG"
+        exit 1
+      fi
+      
+      if [ ! -f "$K8S_YAML" ]; then
+        echo "错误: K8S_YAML 文件不存在: $K8S_YAML"
+        exit 1
+      fi
+      echo "配置文件检查通过"
+      echo "========================================="
+      
+      # 检查并创建 namespace
+      echo "检查 namespace: ${K8S_NAMESPACE}"
+      if kubectl get namespace ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        echo "namespace 已存在"
+      else
+        echo "创建 namespace: ${K8S_NAMESPACE}"
+        kubectl create namespace ${K8S_NAMESPACE}
+      fi
+      echo "========================================="
+      
       # 替换镜像地址（合并 sed 命令）
       sed -i \
         -e "s|SKY_WALKING_AGENT_IMAGE_NAME|${SKY_WALKING_AGENT_IMAGE}|g" \
