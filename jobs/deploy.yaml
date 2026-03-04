@@ -91,8 +91,8 @@
       
       # 替换镜像地址（合并 sed 命令）
       sed -i \
-        -e "s|SKY_WALKING_AGENT_IMAGE_NAME|${SKY_WALKING_AGENT_IMAGE}|g" \
-        -e "s|IMAGE_NAME|${CI_REGISTRY_FULL_IMAGE}|g" \
+        -e "s#SKY_WALKING_AGENT_IMAGE_NAME#${SKY_WALKING_AGENT_IMAGE}#g" \
+        -e "s#IMAGE_NAME#${CI_REGISTRY_FULL_IMAGE}#g" \
         $K8S_YAML
       
       echo "部署配置文件:"
