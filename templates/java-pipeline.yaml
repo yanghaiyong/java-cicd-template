@@ -1,6 +1,9 @@
 include:
   - project: 'cidevops/java-cicd-template'
     ref: master
+    file: 'jobs/debug-cert.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
     file: 'jobs/package.yaml'
   - project: 'cidevops/java-cicd-template'
     ref: master
@@ -80,7 +83,7 @@ stages:
 #  - build
 #  - deploy
 debug-cert:
-  stage: package
+  stage: debug-cert
   extends: .debug-cert
   image: $MAVEN_IMAGE
 
