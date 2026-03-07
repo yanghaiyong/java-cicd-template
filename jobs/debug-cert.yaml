@@ -3,4 +3,4 @@
   script:
     - echo "=== 检查证书目录 ==="
     - pwd
-    - ls -a /home/
+    - ls -a /etc/gitlab-runner
