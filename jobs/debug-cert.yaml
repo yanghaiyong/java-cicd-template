@@ -1,5 +1,5 @@
 .debug-cert:
-  stage: .pre
+  stage: debug-cert
   script:
     - echo "=== 检查证书目录 ==="
     - ls -la /home/gitlab-runner/.gitlab-runner/certs/
