@@ -19,12 +19,13 @@
       - stuck_or_timeout_failure
   variables:
     CI_DEBUG_TRACE: "false" # true表示调试
-    GIT_CHECKOUT: "true" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可，工作目录 = 项目根目录（如 /builds/用户名/项目名/）
+    GIT_CHECKOUT: "false" #表示当前阶段拉取代码,每个作业在开始的时候都会默认拉远程分支并清空构建目录,所有只需要在每个阶段拉代码即可，工作目录 = 项目根目录（如 /builds/用户名/项目名/）
   # 构建前准备
   before_script:
     - |
       ls -la /etc/gitlab-runner/certs/
       cat /etc/gitlab-runner/certs/ca.crt
+      ls /home/gitlab-runner/.gitlab-runner/certs/
       echo "========================================="
       echo "Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
       echo "默认目录: $HOME"
