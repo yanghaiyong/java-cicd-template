@@ -23,6 +23,8 @@
   # 构建前准备
   before_script:
     - |
+      ls -la /etc/gitlab-runner/certs/
+      cat /etc/gitlab-runner/certs/ca.crt
       echo "========================================="
       echo "Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
       echo "默认目录: $HOME"
