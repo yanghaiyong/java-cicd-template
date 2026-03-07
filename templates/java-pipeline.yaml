@@ -87,27 +87,27 @@ debug-cert:
   extends: .debug-cert
   image: $MAVEN_IMAGE
 
-mvn_build:
-  stage: package
-  extends: .mvn_build
-  image: $MAVEN_IMAGE
-
-test:
-  stage: test
-  extends: .test
-  image: $MAVEN_IMAGE
-  needs: ["mvn_build"]
-
-docker_upload:
-  stage: build
-  extends: .docker_upload
-  image: $DOCKER_IMAGE
-  needs: ["mvn_build"]
-
-k8s_deploy:
-  stage: deploy
-  extends: .k8s_deploy
-  image:
-    name: $KUBECTL_IMAGE
-    entrypoint: [ "" ]
-  needs: ["docker_upload"]
+#mvn_build:
+#  stage: package
+#  extends: .mvn_build
+#  image: $MAVEN_IMAGE
+#
+#test:
+#  stage: test
+#  extends: .test
+#  image: $MAVEN_IMAGE
+#  needs: ["mvn_build"]
+#
+#docker_upload:
+#  stage: build
+#  extends: .docker_upload
+#  image: $DOCKER_IMAGE
+#  needs: ["mvn_build"]
+#
+#k8s_deploy:
+#  stage: deploy
+#  extends: .k8s_deploy
+#  image:
+#    name: $KUBECTL_IMAGE
+#    entrypoint: [ "" ]
+#  needs: ["docker_upload"]
