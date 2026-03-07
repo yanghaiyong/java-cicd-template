@@ -5,6 +5,7 @@
 # ============================================
 
 .test:
+  output_limit: 16384
   stage: test
   tags:
     - test
