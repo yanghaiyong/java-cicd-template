@@ -1,40 +1,39 @@
 # Java CI/CD 标准基础模板
 
-一个开箱即用的Java项目CI/CD标准模板，基于GitLab CI/CD设计，支持Maven构建、Docker镜像构建和Kubernetes部署。
+一个开箱即用的 Java 项目 CI/CD 标准模板，基于 GitLab CI/CD 设计，支持 Maven 构建、Docker 镜像构建和 Kubernetes 部署。
 
 ## 📁 目录结构
 
 ```
 java-cicd-template/
-├── .gitlab-ci.yml              # 主CI配置文件
-├── ci/
-│   ├── templates/              # CI/CD模板定义
-│   │   ├── common.yml          # 通用配置模板
-│   │   ├── maven.yml           # Maven构建模板
-│   │   ├── docker.yml          # Docker镜像构建模板
-│   │   └── k8s.yml             # Kubernetes部署模板
-│   ├── docker/
-│   │   └── Dockerfile          # 标准Dockerfile
-│   └── scripts/                # 脚本目录 (预留)
-├── example/
-│   └── .gitlab-ci.yml          # 示例子项目配置
-└── README.md                   # 本文档
+├── jobs/                           # CI/CD Job 模板定义
+│   ├── build.yaml                  # Docker 镜像构建模板
+│   ├── deploy.yaml                 # Kubernetes 部署模板
+│   ├── package.yaml                # Maven 构建打包模板
+│   └── test.yaml                   # Java 测试模板
+├── templates/                      # 流水线模板
+│   └── java-pipeline.yaml          # 主 CI/CD 流水线配置
+└── README.md                       # 本文档
 ```
 
 ## 🚀 快速开始
 
 ### 方式一: 作为子项目引入
 
-在其他Java项目中创建 `.gitlab-ci.yml`:
+在其他 Java 项目中创建 `.gitlab-ci.yml`:
 
 ```yaml
 include:
   - project: 'cidevops/java-cicd-template'
-    file: '.gitlab-ci.yml'
+    ref: master
+    file: 'templates/java-pipeline.yaml'
 
 variables:
+  # 应用名称
   APP_NAME: my-java-app
-  DOCKER_REGISTRY: registry.example.com
+  # Docker Registry 地址
+  CI_REGISTRY: registry.example.com
+  # Kubernetes 命名空间
   K8S_NAMESPACE: production
 ```
 
@@ -45,130 +44,193 @@ variables:
 ```bash
 git clone https://gitlab-ui.test.com/cidevops/java-cicd-template.git
 # 复制必要文件到你的项目
-cp -r ci/ your-project/
-cp .gitlab-ci.yml your-project/
+cp -r jobs/ your-project/
+cp -r templates/ your-project/
 ```
 
 ## 📝 配置说明
 
-### 必需变量
-
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `APP_NAME` | 应用名称 | `my-java-app` |
-| `DOCKER_REGISTRY` | Docker镜像仓库地址 | `registry.example.com` |
-| `K8S_NAMESPACE` | Kubernetes命名空间 | `production` |
-
-### 可选变量
+### 统一变量 (templates/java-pipeline.yaml)
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `DOCKERFILE_PATH` | 自定义Dockerfile路径 | `ci/docker/Dockerfile` |
-| `MAVEN_SETTINGS` | Maven settings.xml (Base64) | 内置默认配置 |
-| `NEXUS_USERNAME` | Nexus仓库用户名 | - |
-| `NEXUS_PASSWORD` | Nexus仓库密码 | - |
+| `MAVEN_IMAGE` | Maven 构建镜像 | `maven:3.9.4-eclipse-temurin-17` |
+| `DOCKER_IMAGE` | Docker 构建镜像 | `docker:cli` |
+| `KUBECTL_IMAGE` | Kubernetes 客户端镜像 | `bitnami/kubectl:latest` |
+| `SKYWALKING_AGENT_IMAGE` | SkyWalking 探针镜像 | `apache/skywalking-java-agent:9.6.0-java17` |
+
+### 构建相关变量
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `BUILD_SHELL` | Maven 构建命令 | `mvn clean package -B -DskipTests -f pom.xml -s settings.xml` |
+| `TEST_SHELL` | 测试命令 | `mvn test -B -U -f pom.xml -s settings.xml` |
+| `ARTIFACTS` | 构建产物路径 | 项目指定的 target 目录 |
+| `CACHE_DIR` | 缓存目录 | 项目指定的 target 目录 |
+| `JUNIT_REPORT_PATH` | 测试报告路径 | `target/surefire-reports/` |
+
+### Docker 相关变量
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `CI_REGISTRY` | Docker Registry 地址 | `k8s-node-1:5000` |
+| `CI_REGISTRY_IMAGE` | 镜像名称 | 项目指定 |
+| `DOCKERFILE_PATH` | Dockerfile 路径 | 项目指定 |
+
+### Kubernetes 部署变量
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `APP_NAME` | 应用名称 | 项目指定 |
+| `K8S_NAMESPACE` | 命名空间 | `default` |
+| `K8S_YAML` | K8s 部署文件路径 | 项目指定 |
+
+### 内置 CI/CD 变量
+
+GitLab 内置变量可直接使用:
+
+| 变量名 | 说明 |
+|--------|------|
+| `CI_COMMIT_SHA` | 当前提交的 SHA-1 哈希值 |
+| `CI_COMMIT_SHORT_SHA` | 当前提交的短 SHA |
+| `CI_COMMIT_TAG` | 当前提交的标签名称 |
+| `CI_COMMIT_BRANCH` | 当前提交的分支名称 |
+| `CI_COMMIT_REF_NAME` | 当前提交的分支或标签名称 |
 
 ## 🔄 流水线阶段
 
-| 阶段 | 说明 | 触发条件 |
-|------|------|----------|
-| **build** | Maven编译打包 | 所有分支和标签 |
-| **test** | 单元测试 | 所有分支和标签 |
-| **docker** | 构建并推送Docker镜像 | 所有分支和标签 |
-| **deploy** | 部署到Kubernetes | 手动触发 |
+| 阶段 | 说明 | Job 名称 | 触发条件 |
+|------|------|----------|----------|
+| **package** | Maven 编译打包 | `mvn_build` | 所有分支和标签 |
+| **test** | 单元测试 + 覆盖率 | `test` | 所有分支和标签 |
+| **build** | Docker 镜像构建并推送 | `docker_upload` | master 分支或 tags |
+| **deploy** | Kubernetes 部署 | `k8s_deploy` | master 分支 (需上游 job 完成) |
+
+## 📦 Job 模板详解
+
+### jobs/package.yaml - Maven 构建
+
+- **模板名称**: `.mvn_build`
+- **功能**: Maven 编译打包，包含缓存优化和自动重试
+- **产物**: JAR 文件保存 30 天
+- **缓存**: Maven 本地仓库 `.m2/repository`
+
+### jobs/test.yaml - 测试
+
+- **模板名称**: `.test`
+- **功能**: 执行单元测试和 JaCoCo 覆盖率统计
+- **报告**: JUnit XML 报告 + JaCoCo 覆盖率报告
+
+### jobs/build.yaml - Docker 构建
+
+- **模板名称**: `.docker_build_base` / `.docker_upload`
+- **功能**: 构建并推送 Docker 镜像到 Registry
+- **特性**: 自动重试、缓存优化、多标签支持
+
+### jobs/deploy.yaml - K8s 部署
+
+- **模板名称**: `.k8s_deploy`
+- **功能**: 部署应用到 Kubernetes 集群
+- **特性**: 自动 namespace 创建、部署验证、回滚支持
 
 ## 🌿 分支策略
 
-| 分支 | 构建 | 测试 | Docker | 部署 |
-|------|------|------|--------|------|
-| `develop` | ✅ | ✅ | ✅ | 手动(开发环境) |
+| 分支 | 构建 | 测试 | Docker 镜像 | K8s 部署 |
+|------|------|------|-------------|----------|
 | `feature/*` | ✅ | ✅ | ✅ | - |
-| `master/main` | ✅ | ✅ | ✅ | 手动(生产环境) |
-| `tag` | ✅ | ✅ | ✅ | 手动(生产环境) |
+| `develop` | ✅ | ✅ | ✅ | 手动 |
+| `master` | ✅ | ✅ | ✅ | 手动 |
+| `tag` | ✅ | ✅ | ✅ | 手动 |
 
-## 📦 Docker镜像标签策略
+## 🏷️ Docker 镜像标签策略
 
 | 触发源 | 镜像标签 |
 |--------|----------|
-| Tag (如 v1.0.0) | `v1.0.0`, `latest` |
+| Tag (如 v1.0.0) | `v1.0.0` |
 | master/main 分支 | `latest` |
 | 其他分支 | Git commit short SHA |
 
-## ☸️ Kubernetes部署
+## ☸️ Kubernetes 部署
 
-### 环境映射
+### 前置要求
 
-- **开发环境**: `develop` 或 `dev` 分支 → `K8S_NAMESPACE-dev`
-- **测试环境**: `develop` 分支 → `K8S_NAMESPACE-test`
-- **生产环境**: `master`/`main` 分支或 Tag → `K8S_NAMESPACE`
+1. 配置 `KUBECONFIG_CONTENT` CI/CD 变量（Base64 编码的 kubeconfig）
+2. 确保目标集群可访问
+3. 准备好 K8s 部署 YAML 文件
 
-### 自定义K8s配置
+### 部署流程
 
-你可以在项目中创建 `k8s/{env}/deployment.yml` 来覆盖默认部署配置:
-
-```
-your-project/
-├── k8s/
-│   ├── dev/
-│   │   └── deployment.yml
-│   ├── test/
-│   │   └── deployment.yml
-│   └── prod/
-│       └── deployment.yml
-└── .gitlab-ci.yml
-```
+1. **构建阶段**: Maven 编译打包 → 生成 JAR
+2. **测试阶段**: 执行单元测试 → 生成测试报告
+3. **镜像阶段**: 构建 Docker 镜像 → 推送到 Registry
+4. **部署阶段**: 更新 K8s Deployment 镜像 → 验证部署状态
 
 ### 回滚操作
 
-每个环境都支持一键回滚到上一版本:
-- 在GitLab UI中点击对应环境的 "Rollback" 按钮
+```bash
+# 使用 kubectl 回滚到上一版本
+kubectl rollout undo deployment/${APP_NAME} -n ${K8S_NAMESPACE}
+
+# 查看部署状态
+kubectl rollout status deployment/${APP_NAME} -n ${K8S_NAMESPACE}
+```
 
 ## 🔧 高级配置
 
-### 自定义Maven构建命令
+### 自定义 Maven 构建命令
 
 ```yaml
-maven_build:
-  script:
-    - mvn clean compile -B -U -Pcustom-profile
+variables:
+  BUILD_SHELL: "mvn clean package -B -U -Pcustom-profile -f pom.xml"
 ```
 
-### 自定义测试覆盖
+### 自定义测试配置
 
 ```yaml
-maven_test:
-  script:
-    - mvn test -B -Pintegration-tests
-  coverage: '/Total.*?([0-9]{1,3})%/'
+variables:
+  TEST_SHELL: "mvn test -B -Pintegration-tests -f pom.xml"
 ```
 
-### 自定义部署脚本
+### 自定义 Docker 镜像名称
 
 ```yaml
-deploy_prod:
-  script:
-    - echo "执行自定义部署逻辑"
-    - kubectl set image deployment/${APP_NAME} ...
+variables:
+  CI_REGISTRY: "my-registry.example.com"
+  CI_REGISTRY_IMAGE: "my-app"
+```
+
+### 使用私有 Maven 仓库
+
+在 `settings.xml` 中配置私有仓库，并在变量中指定:
+
+```yaml
+variables:
+  MAVEN_SETTINGS: "your-base64-encoded-settings.xml"
 ```
 
 ## 📋 GitLab Runner 要求
 
-确保你的GitLab Runner满足以下要求:
+确保你的 GitLab Runner 满足以下要求:
 
-1. **Maven构建**: 需要安装Maven或使用Docker镜像
-2. **Docker构建**: 需要配置Docker-in-Docker (dind)
-3. **Kubernetes部署**: 需要配置Kubeconfig
+### Tag 配置
 
-推荐配置 `.gitlab-runner/config.toml`:
+| Tag 名称 | 用途 | 说明 |
+|----------|------|------|
+| `package` | Maven 构建 | 需要 Maven 镜像 |
+| `test` | 测试执行 | 需要 Maven 镜像 |
+| `build` | Docker 构建 | 需要 Docker 镜像 |
+| `deploy` | K8s 部署 | 需要 kubectl 镜像 |
+
+### 推荐 Runner 配置
 
 ```toml
 [[runners]]
-  name = "docker-runner"
+  name = "java-cicd-runner"
   executor = "docker"
   [runners.docker]
-    image = "ubuntu:22.04"
-    volumes = ["/cache"]
-    privileged = true  # 需要用于Docker-in-Docker
+    image = "maven:3.9.4-eclipse-temurin-17"
+    privileged = true  # 需要用于 Docker-in-Docker
+    volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
 ```
 
 ## 📄 许可证
