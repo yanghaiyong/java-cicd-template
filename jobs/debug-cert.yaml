@@ -3,4 +3,4 @@
   script:
     - echo "=== 检查证书目录 ==="
     - pwd
-    - ls -a /etc/gitlab-runner
+    - ls -a /usr/local/share/ca-certificates
