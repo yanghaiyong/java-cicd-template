@@ -2,5 +2,5 @@
   stage: debug-cert
   script:
     - echo "=== 检查证书目录 ==="
+    - pwd
     - ls -a /etc/gitlab-runner/certs/
-    - ls /home/gitlab-runner/
