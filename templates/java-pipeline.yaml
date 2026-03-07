@@ -82,10 +82,10 @@ stages:
   - test
   - build
   - deploy
-#debug-cert:
-#  stage: debug-cert
-#  extends: .debug-cert
-#  image: $MAVEN_IMAGE
+debug-cert:
+  stage: debug-cert
+  extends: .debug-cert
+  image: $MAVEN_IMAGE
 
 mvn_build:
   stage: package
