@@ -1,0 +1,11 @@
+.debug-cert:
+  stage: .pre
+  script:
+    - echo "=== 检查证书目录 ==="
+    - ls -la /home/gitlab-runner/.gitlab-runner/certs/
+    - echo "=== 检查具体证书 ==="
+    - cat /home/gitlab-runner/.gitlab-runner/certs/gitlab-ui.test.com.crt
+    - echo "=== 检查 Git SSL 配置 ==="
+    - git config --list | grep -i ssl
+    - echo "=== 测试克隆 ==="
+    - git clone https://gitlab-ui.test.com/root/test.git

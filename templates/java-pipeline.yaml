@@ -74,10 +74,15 @@ cache:
     - ${CACHE_DIR}
 
 stages:
-  - package
-  - test
-  - build
-  - deploy
+  - debug-cert
+#  - package
+#  - test
+#  - build
+#  - deploy
+debug-cert:
+  stage: package
+  extends: .debug-cert
+  image: $MAVEN_IMAGE
 
 mvn_build:
   stage: package
