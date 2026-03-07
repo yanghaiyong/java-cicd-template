@@ -3,4 +3,5 @@
   script:
     - echo "=== 检查证书目录 ==="
     - pwd
-    - ls -a /
+    - ls /builds/develop/SpringBootLearning.tmp/
+    - cat /builds/develop/SpringBootLearning.tmp/CI_SERVER_TLS_CA_FILE
