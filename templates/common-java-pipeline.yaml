@@ -63,12 +63,15 @@ variables:
   
   # ============================================
   # K8s 部署相关变量
-  # ============================================
   APP_NAME: "$CI_PROJECT_NAME"
+  
+  # K8s 路径配置
+  K8S_BASE_PATH: "src/main/k8s"
+  K8S_ENV: "dev"
+  K8S_FILE: "deploy.yaml"
   
   # K8s 默认环境配置 (可被 rules 覆盖)
   CI_ENVIRONMENT: "dev"
-  K8S_YAML: 'k8s/${CI_ENVIRONMENT}/deploy.yaml'
   K8S_NAMESPACE: 'app-${CI_ENVIRONMENT}'
   KUBECONFIG: /tmp/kubeconfig
   

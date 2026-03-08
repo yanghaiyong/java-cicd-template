@@ -14,28 +14,34 @@
     - if: '$CI_COMMIT_BRANCH == "develop"'
       variables:
         CI_ENVIRONMENT: "dev"
-        K8S_YAML: 'k8s/dev/deploy.yaml'
-        K8S_NAMESPACE: 'app-dev'
+        K8S_ENV: "dev"
+        K8S_NAMESPACE: "app-dev"
     - if: '$CI_COMMIT_BRANCH == "test"'
       variables:
         CI_ENVIRONMENT: "test"
-        K8S_YAML: 'k8s/test/deploy.yaml'
-        K8S_NAMESPACE: 'app-test'
+        K8S_ENV: "test"
+        K8S_NAMESPACE: "app-test"
     - if: '$CI_COMMIT_BRANCH == "master"'
       variables:
         CI_ENVIRONMENT: "pre-prod"
-        K8S_YAML: 'k8s/pre-prod/deploy.yaml'
-        K8S_NAMESPACE: 'app-pre-prod'
+        K8S_ENV: "pre-prod"
+        K8S_NAMESPACE: "app-pre-prod"
     - if: '$CI_COMMIT_TAG'
       variables:
         CI_ENVIRONMENT: "prod"
-        K8S_YAML: 'k8s/prod/deploy.yaml'
-        K8S_NAMESPACE: 'app-prod'
+        K8S_ENV: "prod"
+        K8S_NAMESPACE: "app-prod"
   before_script:
     - |
       echo "========================================="
       echo "Kubernetes 部署开始 - $(date +'%Y-%m-%d %H:%M:%S')"
       echo "环境: $CI_ENVIRONMENT"
+      echo "K8s 基础路径: $K8S_BASE_PATH"
+      echo "K8s 环境: $K8S_ENV"
+      echo "K8s 文件: $K8S_FILE"
+      
+      # 拼接完整的 K8s YAML 路径
+      export K8S_YAML="${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
       echo "K8s 配置文件: $K8S_YAML"
       echo "K8s Namespace: $K8S_NAMESPACE"
       
@@ -54,6 +60,9 @@
       kubectl version --client
   script:
     - |
+      # 拼接完整的 K8s YAML 路径
+      export K8S_YAML="${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
+      
       echo "========================================="
       echo "开始部署应用"
       

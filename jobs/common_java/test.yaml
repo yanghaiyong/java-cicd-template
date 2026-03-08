@@ -40,7 +40,11 @@
       echo "测试完成 - $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
       echo "测试报告文件:"
-      ls -la $JUNIT_REPORT_PATH
+      if [ -d "$JUNIT_REPORT_PATH" ]; then
+        ls -la $JUNIT_REPORT_PATH || echo "报告目录为空"
+      else
+        echo "报告目录不存在: $JUNIT_REPORT_PATH"
+      fi
       echo "========================================="
   artifacts:
     reports:
