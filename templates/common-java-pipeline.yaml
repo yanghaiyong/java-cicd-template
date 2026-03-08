@@ -85,6 +85,7 @@ variables:
   CONTAINER_PORT: "8080"
   IMAGE_PULL_POLICY: "Always"
   IMAGE_PULL_SECRETS: "docker-secret"
+  DOCKER_CONFIG: "eyJhdXRocyI6eyJrMHMzLW5vZGUtMTo1MDAwIjp7ImF1dGgiOiJhZG1pbmFkbWluIn19fQ==" # kubectl get secret docker-secret -n app-pre-prod-ns -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
   
   # 资源配置
   MEMORY_REQUEST: "256Mi"
@@ -93,7 +94,7 @@ variables:
   CPU_LIMIT: "1000m"
   
   # 健康检查
-  HEALTH_CHECK_PATH: "/health"
+  HEALTH_CHECK_PATH: "/actuator/health"
   LIVENESS_INITIAL_DELAY: "60"
   READINESS_INITIAL_DELAY: "30"
   

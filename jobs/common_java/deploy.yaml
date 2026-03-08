@@ -87,7 +87,16 @@
       
       # 替换 K8s YAML 中的变量（使用 | 分隔符避免变量中特殊字符冲突）
       echo "替换 K8s YAML 变量..."
-      sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
+      
+      # 处理 Secret：如果没有配置 DOCKER_CONFIG，则删除 Secret 部分
+      if [ -z "$DOCKER_CONFIG" ]; then
+        sed -i "/^---$/,/^kind: Secret/d" $K8S_YAML
+        sed -i "/imagePullSecrets:/d" $K8S_YAML
+      else
+        sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
+        sed -i "s|\${DOCKER_CONFIG}|$DOCKER_CONFIG|g" $K8S_YAML
+      fi
+      
       sed -i "s|\${APP_NAME}|$APP_NAME|g" $K8S_YAML
       sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
       sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
@@ -120,7 +129,7 @@
         kubectl create namespace ${K8S_NAMESPACE}
       fi
       
-      # 部署
+      # 部署应用（包含 Secret、ConfigMap、Deployment 等）
       kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}
       
       if [ $? -ne 0 ]; then
