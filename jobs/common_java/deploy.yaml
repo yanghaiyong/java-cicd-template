@@ -38,12 +38,17 @@
       echo "环境: $CI_ENVIRONMENT"
       echo "K8s 配置文件: $K8S_YAML"
       echo "K8s Namespace: $K8S_NAMESPACE"
-      if [ -n "$KUBECONFIG_CONTENT" ]; then
+      
+      # 优先使用 KUBECONFIG_CONTEXT
+      if [ -n "$KUBECONFIG_CONTEXT" ]; then
+        echo "使用 KUBECONFIG_CONTEXT: $KUBECONFIG_CONTEXT"
+        kubectl config use-context $KUBECONFIG_CONTEXT
+      elif [ -n "$KUBECONFIG_CONTENT" ]; then
         echo "$KUBECONFIG_CONTENT" > ${KUBECONFIG}
         chmod 600 ${KUBECONFIG}
         echo "Kubeconfig 配置完成"
       else
-        echo "错误: KUBECONFIG_CONTENT 变量未配置"
+        echo "错误: KUBECONFIG_CONTEXT 或 KUBECONFIG_CONTENT 变量未配置"
         exit 1
       fi
       kubectl version --client
