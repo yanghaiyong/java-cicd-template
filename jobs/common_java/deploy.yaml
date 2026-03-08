@@ -48,7 +48,7 @@
         export KUBECONFIG=""  # 清除旧的 kubeconfig
         kubectl config use-context $KUBECONFIG_CONTEXT
       elif [ -n "$KUBECONFIG_CONTENT" ]; then
-        echo "$KUBECONFIG_CONTENT" > /tmp/kubeconfig
+        echo "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
         chmod 600 /tmp/kubeconfig
         export KUBECONFIG=/tmp/kubeconfig
         echo "Kubeconfig 配置完成"
