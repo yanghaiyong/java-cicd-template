@@ -105,6 +105,13 @@
       sed -i "s|\${HEALTH_CHECK_PATH}|$HEALTH_CHECK_PATH|g" $K8S_YAML
       sed -i "s|\${LIVENESS_INITIAL_DELAY}|$LIVENESS_INITIAL_DELAY|g" $K8S_YAML
       sed -i "s|\${READINESS_INITIAL_DELAY}|$READINESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${HPA_MIN_REPLICAS}|$HPA_MIN_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_MAX_REPLICAS}|$HPA_MAX_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_CPU_THRESHOLD}|$HPA_CPU_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_MEMORY_THRESHOLD}|$HPA_MEMORY_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_SCALE_DOWN_WINDOW}|$HPA_SCALE_DOWN_WINDOW|g" $K8S_YAML
+      sed -i "s|\${JAVA_MIN_HEAP}|$JAVA_MIN_HEAP|g" $K8S_YAML
+      sed -i "s|\${JAVA_MAX_HEAP}|$JAVA_MAX_HEAP|g" $K8S_YAML
       echo "变量替换完成"
       
       # 创建 namespace
