@@ -91,8 +91,6 @@
         echo "错误: K8S_YAML 文件不存在: $K8S_YAML"
         exit 1
       fi
-        exit 1
-      fi
       
       # 替换 K8s YAML 中的变量（使用 | 分隔符避免变量中特殊字符冲突）
       echo "替换 K8s YAML 变量..."
