@@ -154,7 +154,7 @@ GitLab 内置变量可直接使用:
 
 ### 前置要求
 
-1. 配置 `KUBECONFIG_CONTENT` CI/CD 变量（Base64 编码的 kubeconfig）
+1. 配置 `KUBECONFIG_CONTENT` CI/CD 变量（Base64 编码的 kubeconfig）: cat ~/.kube/config | base64 -w 0 或者使用原始的值，具体看deploy.yaml
 2. 确保目标集群可访问
 3. 准备好 K8s 部署 YAML 文件
 
