@@ -128,6 +128,7 @@ package:
 test:
   stage: test
   extends: .test
+  image: $MAVEN_IMAGE
   tags:
     - test
   needs: ["package"]

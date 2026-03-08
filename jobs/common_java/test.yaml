@@ -57,6 +57,8 @@
     paths:
       - ${JUNIT_REPORT_PATH}
       - target/site/jacoco/
+    expose_as: "测试报告"
+    optional: true
   cache:
     policy: pull-push
     key: "maven-${CI_COMMIT_REF_SLUG}"

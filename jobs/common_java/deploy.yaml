@@ -93,26 +93,26 @@
         exit 1
       fi
       
-      # 替换 K8s YAML 中的变量
+      # 替换 K8s YAML 中的变量（使用 | 分隔符避免变量中特殊字符冲突）
       echo "替换 K8s YAML 变量..."
-      sed -i "s/\${APP_NAME}/$APP_NAME/g" $K8S_YAML
-      sed -i "s/\${K8S_NAMESPACE}/$K8S_NAMESPACE/g" $K8S_YAML
-      sed -i "s/\${CI_REGISTRY_FULL_IMAGE}/$CI_REGISTRY_FULL_IMAGE/g" $K8S_YAML
-      sed -i "s/\${IMAGE_TAG}/$IMAGE_TAG/g" $K8S_YAML
-      sed -i "s/\${SERVICE_TYPE}/$SERVICE_TYPE/g" $K8S_YAML
-      sed -i "s/\${SERVICE_PORT}/$SERVICE_PORT/g" $K8S_YAML
-      sed -i "s/\${CONTAINER_PORT}/$CONTAINER_PORT/g" $K8S_YAML
-      sed -i "s/\${IMAGE_PULL_POLICY}/$IMAGE_PULL_POLICY/g" $K8S_YAML
-      sed -i "s/\${REPLICAS}/$REPLICAS/g" $K8S_YAML
-      sed -i "s/\${MAX_SURGE}/$MAX_SURGE/g" $K8S_YAML
-      sed -i "s/\${MAX_UNAVAILABLE}/$MAX_UNAVAILABLE/g" $K8S_YAML
-      sed -i "s/\${MEMORY_REQUEST}/$MEMORY_REQUEST/g" $K8S_YAML
-      sed -i "s/\${CPU_REQUEST}/$CPU_REQUEST/g" $K8S_YAML
-      sed -i "s/\${MEMORY_LIMIT}/$MEMORY_LIMIT/g" $K8S_YAML
-      sed -i "s/\${CPU_LIMIT}/$CPU_LIMIT/g" $K8S_YAML
-      sed -i "s/\${HEALTH_CHECK_PATH}/$HEALTH_CHECK_PATH/g" $K8S_YAML
-      sed -i "s/\${LIVENESS_INITIAL_DELAY}/$LIVENESS_INITIAL_DELAY/g" $K8S_YAML
-      sed -i "s/\${READINESS_INITIAL_DELAY}/$READINESS_INITIAL_DELAY/g" $K8S_YAML
+      sed -i "s|\${APP_NAME}|$APP_NAME|g" $K8S_YAML
+      sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
+      sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
+      sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" $K8S_YAML
+      sed -i "s|\${SERVICE_TYPE}|$SERVICE_TYPE|g" $K8S_YAML
+      sed -i "s|\${SERVICE_PORT}|$SERVICE_PORT|g" $K8S_YAML
+      sed -i "s|\${CONTAINER_PORT}|$CONTAINER_PORT|g" $K8S_YAML
+      sed -i "s|\${IMAGE_PULL_POLICY}|$IMAGE_PULL_POLICY|g" $K8S_YAML
+      sed -i "s|\${REPLICAS}|$REPLICAS|g" $K8S_YAML
+      sed -i "s|\${MAX_SURGE}|$MAX_SURGE|g" $K8S_YAML
+      sed -i "s|\${MAX_UNAVAILABLE}|$MAX_UNAVAILABLE|g" $K8S_YAML
+      sed -i "s|\${MEMORY_REQUEST}|$MEMORY_REQUEST|g" $K8S_YAML
+      sed -i "s|\${CPU_REQUEST}|$CPU_REQUEST|g" $K8S_YAML
+      sed -i "s|\${MEMORY_LIMIT}|$MEMORY_LIMIT|g" $K8S_YAML
+      sed -i "s|\${CPU_LIMIT}|$CPU_LIMIT|g" $K8S_YAML
+      sed -i "s|\${HEALTH_CHECK_PATH}|$HEALTH_CHECK_PATH|g" $K8S_YAML
+      sed -i "s|\${LIVENESS_INITIAL_DELAY}|$LIVENESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${READINESS_INITIAL_DELAY}|$READINESS_INITIAL_DELAY|g" $K8S_YAML
       echo "变量替换完成"
       
       # 创建 namespace
