@@ -4,8 +4,6 @@
 
 .test:
   stage: test
-  tags:
-    - test
   retry:
     max: 2
     when:

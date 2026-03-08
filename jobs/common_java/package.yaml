@@ -3,10 +3,7 @@
 # ============================================
 
 .mvn_build:
-  image: $MAVEN_IMAGE
   stage: package
-  tags:
-    - package
   retry:
     max: 2
     when:

@@ -3,11 +3,8 @@
 # ============================================
 
 .docker_build:
-  image: $DOCKER_IMAGE
   stage: build
   when: on_success
-  tags:
-    - build
   before_script:
     - |
       echo "========================================="

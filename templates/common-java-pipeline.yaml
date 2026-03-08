@@ -93,6 +93,17 @@ variables:
   HEALTH_CHECK_PATH: "/health"
   LIVENESS_INITIAL_DELAY: "60"
   READINESS_INITIAL_DELAY: "30"
+  
+  # Java堆内存配置
+  JAVA_MIN_HEAP: "256m"
+  JAVA_MAX_HEAP: "512m"
+  
+  # HPA配置
+  HPA_MIN_REPLICAS: "2"
+  HPA_MAX_REPLICAS: "10"
+  HPA_CPU_THRESHOLD: "70"
+  HPA_MEMORY_THRESHOLD: "80"
+  HPA_SCALE_DOWN_WINDOW: "300"
 
 cache:
   paths:
@@ -109,17 +120,22 @@ package:
   stage: package
   extends: .mvn_build
   image: $MAVEN_IMAGE
+  tags:
+    - package
 
 test:
   stage: test
   extends: .test
-  image: $MAVEN_IMAGE
+  tags:
+    - test
   needs: ["package"]
 
 build:
   stage: build
   extends: .docker_build
   image: $DOCKER_IMAGE
+  tags:
+    - build
   needs: ["package"]
 
 deploy:
@@ -128,4 +144,6 @@ deploy:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
+  tags:
+    - deploy
   needs: ["build"]

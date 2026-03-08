@@ -4,12 +4,7 @@
 
 .k8s_deploy:
   stage: deploy
-  image:
-    name: $KUBECTL_IMAGE
-    entrypoint: [ "" ]
   when: on_success
-  tags:
-    - deploy
   retry:
     max: 2
     when:
