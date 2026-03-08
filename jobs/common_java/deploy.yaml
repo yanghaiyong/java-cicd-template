@@ -14,19 +14,19 @@
     - if: '$CI_COMMIT_BRANCH == "develop"'
       variables:
         K8S_ENV: "dev"
-        K8S_NAMESPACE: "app-dev"
+        K8S_NAMESPACE: "app-dev-ns"
     - if: '$CI_COMMIT_BRANCH == "test"'
       variables:
         K8S_ENV: "test"
-        K8S_NAMESPACE: "app-test"
+        K8S_NAMESPACE: "app-test-ns"
     - if: '$CI_COMMIT_BRANCH == "master"'
       variables:
         K8S_ENV: "pre-prod"
-        K8S_NAMESPACE: "app-pre-prod"
+        K8S_NAMESPACE: "app-pre-prod-ns"
     - if: '$CI_COMMIT_TAG'
       variables:
         K8S_ENV: "prod"
-        K8S_NAMESPACE: "app-prod"
+        K8S_NAMESPACE: "app-prod-ns"
   before_script:
     - |
       echo "========================================="
@@ -67,20 +67,13 @@
       
       # 确定镜像标签策略
       if [ -n "$CI_COMMIT_TAG" ]; then
+        # 生产环境：使用 Git Tag
         IMAGE_TAG=$CI_COMMIT_TAG
         echo "正式发布 - 使用 Tag: $IMAGE_TAG"
-      elif [ "$CI_COMMIT_BRANCH" == "master" ]; then
-        IMAGE_TAG="$CI_COMMIT_REF_SLUG-pre"
-        echo "预生产 - 使用 pre-prod 标签: $IMAGE_TAG"
-      elif [ "$CI_COMMIT_BRANCH" == "test" ]; then
-        IMAGE_TAG="test-latest"
-        echo "测试环境 - 使用 test-latest 标签"
-      elif [ "$CI_COMMIT_BRANCH" == "develop" ]; then
-        IMAGE_TAG="develop-latest"
-        echo "开发环境 - 使用 develop-latest 标签"
       else
-        IMAGE_TAG=$CI_COMMIT_SHORT_SHA
-        echo "特性分支 - 使用短 SHA 标签: $IMAGE_TAG"
+        # 其他环境：使用分支名+短SHA
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+        echo "非生产环境 - 使用分支标签: $IMAGE_TAG"
       fi
       
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
