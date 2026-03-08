@@ -41,13 +41,16 @@
       echo "K8s 配置文件: $K8S_YAML"
       echo "K8s Namespace: $K8S_NAMESPACE"
       
-      # 优先使用 KUBECONFIG_CONTEXT
+      # 优先使用 KUBECONFIG_CONTEXT 这个是name方式
+      # 两种方式 KUBECONFIG_CONTENT 这个是base64的
       if [ -n "$KUBECONFIG_CONTEXT" ]; then
         echo "使用 KUBECONFIG_CONTEXT: $KUBECONFIG_CONTEXT"
+        export KUBECONFIG=""  # 清除旧的 kubeconfig
         kubectl config use-context $KUBECONFIG_CONTEXT
       elif [ -n "$KUBECONFIG_CONTENT" ]; then
-        echo "$KUBECONFIG_CONTENT" > ${KUBECONFIG}
-        chmod 600 ${KUBECONFIG}
+        echo "$KUBECONFIG_CONTENT" > /tmp/kubeconfig
+        chmod 600 /tmp/kubeconfig
+        export KUBECONFIG=/tmp/kubeconfig
         echo "Kubeconfig 配置完成"
       else
         echo "错误: KUBECONFIG_CONTEXT 或 KUBECONFIG_CONTENT 变量未配置"
@@ -83,13 +86,11 @@
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
       
-      # 检查文件
-      if [ ! -f "$KUBECONFIG" ]; then
-        echo "错误: Kubeconfig 文件不存在"
-        exit 1
-      fi
+      # 检查 K8s YAML 文件
       if [ ! -f "$K8S_YAML" ]; then
         echo "错误: K8S_YAML 文件不存在: $K8S_YAML"
+        exit 1
+      fi
         exit 1
       fi
       

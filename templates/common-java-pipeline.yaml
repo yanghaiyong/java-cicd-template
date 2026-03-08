@@ -73,7 +73,6 @@ variables:
   
   # K8s 默认配置 (可被 rules 覆盖)
   K8S_NAMESPACE: 'app-${K8S_ENV}'
-  KUBECONFIG: /tmp/kubeconfig
   
   # K8s 资源配置 (可在 k8s yaml 中使用)
   REPLICAS: "2"
