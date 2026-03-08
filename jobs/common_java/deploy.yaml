@@ -85,31 +85,14 @@
         exit 1
       fi
       
-      # 设置变量默认值
-      : ${SERVICE_TYPE:=ClusterIP}
-      : ${SERVICE_PORT:=8080}
-      : ${CONTAINER_PORT:=8080}
-      : ${IMAGE_PULL_POLICY:=Always}
-      : ${REPLICAS:=2}
-      : ${MAX_SURGE:=1}
-      : ${MAX_UNAVAILABLE:=0}
-      : ${MEMORY_REQUEST:=256Mi}
-      : ${CPU_REQUEST:=200m}
-      : ${MEMORY_LIMIT:=512Mi}
-      : ${CPU_LIMIT:=1000m}
-      : ${HEALTH_CHECK_PATH:=/health}
-      : ${LIVENESS_INITIAL_DELAY:=60}
-      : ${READINESS_INITIAL_DELAY:=30}
-      : ${JAVA_MIN_HEAP:=256m}
-      : ${JAVA_MAX_HEAP:=512m}
-      : ${HPA_MIN_REPLICAS:=2}
-      : ${HPA_MAX_REPLICAS:=10}
-      : ${HPA_CPU_THRESHOLD:=70}
-      : ${HPA_MEMORY_THRESHOLD:=80}
-      : ${HPA_SCALE_DOWN_WINDOW:=300}
-      
       # 替换 K8s YAML 中的变量（使用 | 分隔符避免变量中特殊字符冲突）
       echo "替换 K8s YAML 变量..."
+      # 仅当 IMAGE_PULL_SECRETS 不为空时替换
+      if [ -n "$IMAGE_PULL_SECRETS" ]; then
+        sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
+      else
+        sed -i "/imagePullSecrets:/,/name:/d" $K8S_YAML
+      fi
       sed -i "s|\${APP_NAME}|$APP_NAME|g" $K8S_YAML
       sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
       sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
