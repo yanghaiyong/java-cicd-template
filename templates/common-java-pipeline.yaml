@@ -70,9 +70,8 @@ variables:
   K8S_ENV: "dev"
   K8S_FILE: "deploy.yaml"
   
-  # K8s 默认环境配置 (可被 rules 覆盖)
-  CI_ENVIRONMENT: "dev"
-  K8S_NAMESPACE: 'app-${CI_ENVIRONMENT}'
+  # K8s 默认配置 (可被 rules 覆盖)
+  K8S_NAMESPACE: 'app-${K8S_ENV}'
   KUBECONFIG: /tmp/kubeconfig
   
   # K8s 资源配置 (可在 k8s yaml 中使用)
