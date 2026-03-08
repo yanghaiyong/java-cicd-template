@@ -118,7 +118,7 @@ stages:
 
 package:
   stage: package
-  extends: .mvn_build
+  extends: .mvn_package
   image: $MAVEN_IMAGE
   tags:
     - package

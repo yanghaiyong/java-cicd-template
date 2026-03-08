@@ -2,7 +2,7 @@
 # Java Maven 构建
 # ============================================
 
-.mvn_build:
+.mvn_package:
   stage: package
   retry:
     max: 2
