@@ -85,7 +85,9 @@ variables:
   CONTAINER_PORT: "8080"
   IMAGE_PULL_POLICY: "Always"
   IMAGE_PULL_SECRETS: "docker-secret"
-  DOCKER_CONFIG: "eyJhdXRocyI6eyJrMHMzLW5vZGUtMTo1MDAwIjp7ImF1dGgiOiJhZG1pbmFkbWluIn19fQ==" # kubectl get secret docker-secret -n app-pre-prod-ns -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d
+  # Docker Registry 认证配置（base64编码的 dockerconfigjson）
+  # 格式: echo -n '{"auths":{"your-registry:5000":{"auth":"'$(echo -n "username:password" | base64 -w 0)'"}}}' | base64 -w 0
+  DOCKER_CONFIG: "eyJhdXRocyI6eyJrOHMtbm9kZS0xOjUwMDAiOnsiYXV0aCI6IllXUnRhVzQ2WVdSdGFXND0ifX19"
   
   # 资源配置
   MEMORY_REQUEST: "256Mi"
