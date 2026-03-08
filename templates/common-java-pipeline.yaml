@@ -84,7 +84,7 @@ variables:
   SERVICE_PORT: "8080"
   CONTAINER_PORT: "8080"
   IMAGE_PULL_POLICY: "Always"
-  IMAGE_PULL_SECRETS: ""
+  IMAGE_PULL_SECRETS: "docker-secret"
   
   # 资源配置
   MEMORY_REQUEST: "256Mi"
