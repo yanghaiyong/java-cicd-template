@@ -44,6 +44,7 @@ variables:
   BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
   TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
   JUNIT_REPORT_PATH: 'target/surefire-reports/'
+  JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
   
   # 构建产物目录
