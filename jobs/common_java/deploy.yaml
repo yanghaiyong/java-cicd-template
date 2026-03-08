@@ -125,6 +125,20 @@
         kubectl create namespace ${K8S_NAMESPACE}
       fi
       
+      # 创建 Docker Registry Secret（如果配置了 IMAGE_PULL_SECRETS）
+      if [ -n "$IMAGE_PULL_SECRETS" ] && [ -n "$CI_REGISTRY_USER" ] && [ -n "$CI_REGISTRY_PASSWORD" ]; then
+        if ! kubectl get secret ${IMAGE_PULL_SECRETS} -n ${K8S_NAMESPACE} >/dev/null 2>&1; then
+          kubectl create secret docker-registry ${IMAGE_PULL_SECRETS} \
+            --docker-server=${CI_REGISTRY} \
+            --docker-username=${CI_REGISTRY_USER} \
+            --docker-password=${CI_REGISTRY_PASSWORD} \
+            -n ${K8S_NAMESPACE}
+          echo "Docker Registry Secret 创建成功"
+        else
+          echo "Docker Secret 已存在"
+        fi
+      fi
+      
       # 部署
       kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}
       
