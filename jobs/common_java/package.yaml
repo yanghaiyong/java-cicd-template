@@ -1,0 +1,47 @@
+# ============================================
+# Java Maven 构建
+# ============================================
+
+.mvn_build:
+  image: $MAVEN_IMAGE
+  stage: package
+  tags:
+    - package
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "默认目录: $HOME"
+      echo "========================================="
+      echo "构建命令: $BUILD_SHELL"
+      echo "Java 版本: $(java -version 2>&1 | head -1)"
+      echo "Maven 版本: $(mvn -version 2>&1 | head -1)"
+      mkdir -p .m2/repository
+      echo "工作目录: $(pwd)"
+      echo "磁盘空间: $(df -h . | tail -1)"
+  script:
+    - $BUILD_SHELL
+  after_script:
+    - |
+      echo "========================================="
+      echo "Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR 文件"
+      ls -la $CACHE_DIR
+  artifacts:
+    name: '$ARTIFACTS_NAME'
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - ${ARTIFACTS}*.jar
+  cache:
+    policy: pull-push
+    key: "maven-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .m2/repository
+      - ${CACHE_DIR}

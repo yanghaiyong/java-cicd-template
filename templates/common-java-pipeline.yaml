@@ -1,0 +1,131 @@
+# ============================================
+# 通用 Java CI/CD 流水线模板
+# ============================================
+# 基于分支自动识别环境：develop -> test -> master -> tag
+#
+# 使用方式：
+#   在项目 .gitlab-ci.yml 中:
+#   include:
+#     - template: common-java-pipeline.yaml
+# ============================================
+
+include:
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java/package.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java/test.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java/build.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java/deploy.yaml'
+
+variables:
+  # ============================================
+  # 统一镜像变量
+  # ============================================
+  MAVEN_IMAGE: "maven:3.9.4-eclipse-temurin-17"
+  DOCKER_IMAGE: "docker:cli"
+  KUBECTL_IMAGE: "bitnami/kubectl:latest"
+  SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
+  
+  # ============================================
+  # 通用 CI 变量
+  # ============================================
+  CI_DEBUG_TRACE: "false"
+  GIT_CHECKOUT: "true"
+  
+  # ============================================
+  # Maven 构建相关变量
+  # ============================================
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+  JUNIT_REPORT_PATH: 'target/surefire-reports/'
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
+  
+  # 构建产物目录
+  CACHE_DIR: 'target/'
+  ARTIFACTS: 'target/'
+  ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
+  
+  # ============================================
+  # Docker 相关变量
+  # ============================================
+  DOCKERFILE_PATH: 'Dockerfile'
+  CI_REGISTRY_USER: "admin"
+  CI_REGISTRY_PASSWORD: "admin"
+  CI_REGISTRY: "k8s-node-1:5000"
+  CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
+  CI_REGISTRY_FULL_IMAGE: "$CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+  
+  # ============================================
+  # K8s 部署相关变量
+  # ============================================
+  APP_NAME: "$CI_PROJECT_NAME"
+  
+  # K8s 默认环境配置 (可被 rules 覆盖)
+  CI_ENVIRONMENT: "dev"
+  K8S_YAML: 'k8s/${CI_ENVIRONMENT}/deploy.yaml'
+  K8S_NAMESPACE: 'app-${CI_ENVIRONMENT}'
+  KUBECONFIG: /tmp/kubeconfig
+  
+  # K8s 资源配置 (可在 k8s yaml 中使用)
+  REPLICAS: "2"
+  MAX_SURGE: "1"
+  MAX_UNAVAILABLE: "0"
+  
+  # 容器配置
+  SERVICE_TYPE: "ClusterIP"
+  SERVICE_PORT: "8080"
+  CONTAINER_PORT: "8080"
+  IMAGE_PULL_POLICY: "Always"
+  
+  # 资源配置
+  MEMORY_REQUEST: "256Mi"
+  CPU_REQUEST: "200m"
+  MEMORY_LIMIT: "512Mi"
+  CPU_LIMIT: "1000m"
+  
+  # 健康检查
+  HEALTH_CHECK_PATH: "/health"
+  LIVENESS_INITIAL_DELAY: "60"
+  READINESS_INITIAL_DELAY: "30"
+
+cache:
+  paths:
+    - .m2/repository
+    - ${CACHE_DIR}
+
+stages:
+  - package
+  - test
+  - build
+  - deploy
+
+package:
+  stage: package
+  extends: .mvn_build
+  image: $MAVEN_IMAGE
+
+test:
+  stage: test
+  extends: .test
+  image: $MAVEN_IMAGE
+  needs: ["package"]
+
+build:
+  stage: build
+  extends: .docker_build
+  image: $DOCKER_IMAGE
+  needs: ["package"]
+
+deploy:
+  stage: deploy
+  extends: .k8s_deploy
+  image:
+    name: $KUBECTL_IMAGE
+    entrypoint: [ "" ]
+  needs: ["build"]
