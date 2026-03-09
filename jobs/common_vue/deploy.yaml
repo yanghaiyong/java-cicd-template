@@ -1,0 +1,148 @@
+# ============================================
+# 前端 K8s 部署 - 支持多环境自动识别
+# ============================================
+
+.k8s_deploy:
+  stage: deploy
+  when: on_success
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        K8S_ENV: "dev"
+        K8S_NAMESPACE: "app-dev-ns"
+    - if: '$CI_COMMIT_BRANCH == "test"'
+      variables:
+        K8S_ENV: "test"
+        K8S_NAMESPACE: "app-test-ns"
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      variables:
+        K8S_ENV: "pre-prod"
+        K8S_NAMESPACE: "app-pre-prod-ns"
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        K8S_ENV: "prod"
+        K8S_NAMESPACE: "app-prod-ns"
+  before_script:
+    - |
+      echo "========================================="
+      echo "Kubernetes 部署开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "环境: $K8S_ENV"
+      echo "K8s 基础路径: $K8S_BASE_PATH"
+      echo "K8s 环境: $K8S_ENV"
+      echo "K8s 文件: $K8S_FILE"
+      
+      # 拼接完整的 K8s YAML 路径
+      export K8S_YAML="${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
+      echo "K8s 配置文件: $K8S_YAML"
+      echo "K8s Namespace: $K8S_NAMESPACE"
+      
+      # 优先使用 KUBECONFIG_CONTEXT 这个是name方式
+      # 两种方式 KUBECONFIG_CONTENT 这个是base64的
+      if [ -n "$KUBECONFIG_CONTEXT" ]; then
+        echo "使用 KUBECONFIG_CONTEXT: $KUBECONFIG_CONTEXT"
+        export KUBECONFIG=""  # 清除旧的 kubeconfig
+        kubectl config use-context $KUBECONFIG_CONTEXT
+      elif [ -n "$KUBECONFIG_CONTENT" ]; then
+        echo "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
+        chmod 600 /tmp/kubeconfig
+        export KUBECONFIG=/tmp/kubeconfig
+        echo "Kubeconfig 配置完成"
+      else
+        echo "错误: KUBECONFIG_CONTEXT 或 KUBECONFIG_CONTENT 变量未配置"
+        exit 1
+      fi
+      kubectl version --client
+  script:
+    - |
+      # 拼接完整的 K8s YAML 路径
+      export K8S_YAML="${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
+      
+      echo "========================================="
+      echo "开始部署应用"
+      
+      # 确定镜像标签策略
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        # 生产环境：使用 Git Tag
+        IMAGE_TAG=$CI_COMMIT_TAG
+        echo "正式发布 - 使用 Tag: $IMAGE_TAG"
+      else
+        # 其他环境：使用分支名+短SHA
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+        echo "非生产环境 - 使用分支标签: $IMAGE_TAG"
+      fi
+      
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+      echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
+      
+      # 检查 K8s YAML 文件
+      if [ ! -f "$K8S_YAML" ]; then
+        echo "错误: K8S_YAML 文件不存在: $K8S_YAML"
+        exit 1
+      fi
+      
+      # 替换 K8s YAML 中的变量（使用 | 分隔符避免变量中特殊字符冲突）
+      echo "替换 K8s YAML 变量..."
+      
+      # 处理 Secret：如果没有配置 DOCKER_CONFIG，则删除 Secret 部分
+      if [ -z "$DOCKER_CONFIG" ]; then
+        sed -i "/^---$/,/^kind: Secret/d" $K8S_YAML
+        sed -i "/imagePullSecrets:/d" $K8S_YAML
+      else
+        sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
+        sed -i "s|\${DOCKER_CONFIG}|$DOCKER_CONFIG|g" $K8S_YAML
+      fi
+      
+      sed -i "s|\${APP_NAME}|$APP_NAME|g" $K8S_YAML
+      sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
+      sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
+      sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" $K8S_YAML
+      sed -i "s|\${SERVICE_TYPE}|$SERVICE_TYPE|g" $K8S_YAML
+      sed -i "s|\${SERVICE_PORT}|$SERVICE_PORT|g" $K8S_YAML
+      sed -i "s|\${CONTAINER_PORT}|$CONTAINER_PORT|g" $K8S_YAML
+      sed -i "s|\${IMAGE_PULL_POLICY}|$IMAGE_PULL_POLICY|g" $K8S_YAML
+      sed -i "s|\${REPLICAS}|$REPLICAS|g" $K8S_YAML
+      sed -i "s|\${MAX_SURGE}|$MAX_SURGE|g" $K8S_YAML
+      sed -i "s|\${MAX_UNAVAILABLE}|$MAX_UNAVAILABLE|g" $K8S_YAML
+      sed -i "s|\${MEMORY_REQUEST}|$MEMORY_REQUEST|g" $K8S_YAML
+      sed -i "s|\${CPU_REQUEST}|$CPU_REQUEST|g" $K8S_YAML
+      sed -i "s|\${MEMORY_LIMIT}|$MEMORY_LIMIT|g" $K8S_YAML
+      sed -i "s|\${CPU_LIMIT}|$CPU_LIMIT|g" $K8S_YAML
+      sed -i "s|\${HEALTH_CHECK_PATH}|$HEALTH_CHECK_PATH|g" $K8S_YAML
+      sed -i "s|\${LIVENESS_INITIAL_DELAY}|$LIVENESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${READINESS_INITIAL_DELAY}|$READINESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${HPA_MIN_REPLICAS}|$HPA_MIN_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_MAX_REPLICAS}|$HPA_MAX_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_CPU_THRESHOLD}|$HPA_CPU_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_MEMORY_THRESHOLD}|$HPA_MEMORY_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_SCALE_DOWN_WINDOW}|$HPA_SCALE_DOWN_WINDOW|g" $K8S_YAML
+      sed -i "s|\${INGRESS_HOST}|$INGRESS_HOST|g" $K8S_YAML
+      echo "变量替换完成"
+      
+      # 创建 namespace
+      if ! kubectl get namespace ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        kubectl create namespace ${K8S_NAMESPACE}
+      fi
+      
+      # 部署应用（包含 Secret、ConfigMap、Deployment 等）
+      kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}
+      
+      if [ $? -ne 0 ]; then
+        echo "部署失败！"
+        exit 1
+      fi
+      
+      echo "部署完成！"
+      kubectl get deployments -n ${K8S_NAMESPACE}
+      kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME}
+  after_script:
+    - |
+      echo "========================================="
+      echo "Kubernetes 部署完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+  cache:
+    policy: push
+  needs: ["build"]
