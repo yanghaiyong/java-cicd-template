@@ -14,19 +14,19 @@
     - if: '$CI_COMMIT_BRANCH == "develop"'
       variables:
         K8S_ENV: "dev"
-        K8S_NAMESPACE: "app-dev-ns"
+        K8S_NAMESPACE: "app-dev"
     - if: '$CI_COMMIT_BRANCH == "test"'
       variables:
         K8S_ENV: "test"
-        K8S_NAMESPACE: "app-test-ns"
+        K8S_NAMESPACE: "app-test"
     - if: '$CI_COMMIT_BRANCH == "master"'
       variables:
         K8S_ENV: "pre-prod"
-        K8S_NAMESPACE: "app-pre-prod-ns"
+        K8S_NAMESPACE: "app-pre-prod"
     - if: '$CI_COMMIT_TAG'
       variables:
         K8S_ENV: "prod"
-        K8S_NAMESPACE: "app-prod-ns"
+        K8S_NAMESPACE: "app-prod"
   before_script:
     - |
       echo "========================================="
