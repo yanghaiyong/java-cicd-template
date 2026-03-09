@@ -101,6 +101,14 @@ variables:
   # Ingress 配置
   INGRESS_HOST: "www.example.com"
   
+  # TLS 证书配置
+  CERT_ISSUER: "vault-issuer"
+  TLS_COMMON_NAME: "*.test.com"
+  TLS_DNS_NAME: "*.test.com"
+  TLS_BASE_DOMAIN: "test.com"
+  TLS_DURATION: "2160h"
+  TLS_RENEW_BEFORE: "360h"
+  
   # 前端运行时配置
   API_BASE_URL: "/api"
   APP_TITLE: "RiverLake Help"
