@@ -66,7 +66,7 @@ variables:
   K8S_NAMESPACE: 'app-${K8S_ENV}'
   
   # K8s 默认配置
-  REPLICAS: "2"
+  REPLICAS: "1"
   MAX_SURGE: "1"
   MAX_UNAVAILABLE: "0"
   
@@ -92,7 +92,7 @@ variables:
   READINESS_INITIAL_DELAY: "5"
   
   # HPA配置
-  HPA_MIN_REPLICAS: "2"
+  HPA_MIN_REPLICAS: "1"
   HPA_MAX_REPLICAS: "10"
   HPA_CPU_THRESHOLD: "70"
   HPA_MEMORY_THRESHOLD: "80"

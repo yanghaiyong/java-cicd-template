@@ -75,7 +75,7 @@ variables:
   K8S_NAMESPACE: 'app-${K8S_ENV}'
   
   # K8s 资源配置 (可在 k8s yaml 中使用)
-  REPLICAS: "2"
+  REPLICAS: "1"
   MAX_SURGE: "1"
   MAX_UNAVAILABLE: "0"
   
@@ -105,7 +105,7 @@ variables:
   JAVA_MAX_HEAP: "512m"
   
   # HPA配置
-  HPA_MIN_REPLICAS: "2"
+  HPA_MIN_REPLICAS: "1"
   HPA_MAX_REPLICAS: "10"
   HPA_CPU_THRESHOLD: "70"
   HPA_MEMORY_THRESHOLD: "80"
