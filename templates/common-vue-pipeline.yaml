@@ -107,8 +107,8 @@ cache:
 
 stages:
   - package
-#  - build
-#  - deploy
+  - build
+  - deploy
 
 package:
   stage: package
@@ -117,20 +117,20 @@ package:
   tags:
     - package
 
-#build:
-#  stage: build
-#  extends: .docker_build
-#  image: $DOCKER_IMAGE
-#  tags:
-#    - build
-#  needs: ["package"]
-#
-#deploy:
-#  stage: deploy
-#  extends: .k8s_deploy
-#  image:
-#    name: $KUBECTL_IMAGE
-#    entrypoint: [ "" ]
-#  tags:
-#    - deploy
-#  needs: ["build"]
+build:
+  stage: build
+  extends: .docker_build
+  image: $DOCKER_IMAGE
+  tags:
+    - build
+  needs: ["package"]
+
+deploy:
+  stage: deploy
+  extends: .k8s_deploy
+  image:
+    name: $KUBECTL_IMAGE
+    entrypoint: [ "" ]
+  tags:
+    - deploy
+  needs: ["build"]
