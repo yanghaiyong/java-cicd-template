@@ -20,7 +20,7 @@
       echo "工作目录: $(pwd)"
       echo "磁盘空间: $(df -h . | tail -1)"
   script:
-    - $NPM_BUILD_SHELL
+    - "eval $NPM_BUILD_SHELL"
   after_script:
     - |
       echo "========================================="
