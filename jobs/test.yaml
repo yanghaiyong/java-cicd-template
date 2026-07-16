@@ -6,7 +6,6 @@
 
 .test:
   stage: test
-  tags:
     - test
   # 自动化重试机制 - 网络异常时自动重试
   retry:

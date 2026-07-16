@@ -8,7 +8,6 @@
 .k8s_deploy:
   stage: deploy
   when: on_success
-  tags:
     - deploy
   only:
     - master
