@@ -126,20 +126,17 @@ package:
   stage: package
   extends: .mvn_package
   image: $MAVEN_IMAGE
-    - package
 
 test:
   stage: test
   extends: .test
   image: $MAVEN_IMAGE
-    - test
   needs: ["package"]
 
 build:
   stage: build
   extends: .docker_build
   image: $DOCKER_IMAGE
-    - build
   needs: ["package"]
 
 deploy:
@@ -148,5 +145,4 @@ deploy:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-    - deploy
   needs: ["build"]
