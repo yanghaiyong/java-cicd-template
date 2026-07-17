@@ -43,7 +43,7 @@
   extends: .docker_build_base
   stage: build
   when: on_success
-    - build
+
   only: #  表示只有 master 分支或创建 tag 时才会触发此 job
     - master
     - tags

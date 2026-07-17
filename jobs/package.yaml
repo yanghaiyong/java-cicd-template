@@ -9,7 +9,7 @@
 .mvn_build:
   image: $MAVEN_IMAGE
   stage: package
-    - package
+
   # 自动化重试机制 - 网络异常时自动重试
   retry:
     max: 2

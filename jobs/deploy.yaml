@@ -8,7 +8,7 @@
 .k8s_deploy:
   stage: deploy
   when: on_success
-    - deploy
+
   only:
     - master
   # 自动化重试机制
