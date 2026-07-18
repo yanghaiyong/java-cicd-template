@@ -56,7 +56,10 @@ variables:
   # Docker 相关变量
   # ============================================
   DOCKERFILE_PATH: 'Dockerfile'
-  # CI_REGISTRY_USER / CI_REGISTRY_PASSWORD 在 GitLab CI/CD Variables 中配置（Masked）
+  # DOCKER_AUTH_CONFIG 优先于 CI_REGISTRY_USER/PASSWORD（见 Docker 私服安装教程）
+  # 如已配置 DOCKER_AUTH_CONFIG，以下两项可保持注释状态
+  # CI_REGISTRY_USER: "admin"
+  # CI_REGISTRY_PASSWORD: "admin"
   CI_REGISTRY: "k8s-node-1:5000"
   CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
   CI_REGISTRY_FULL_IMAGE: "$CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
