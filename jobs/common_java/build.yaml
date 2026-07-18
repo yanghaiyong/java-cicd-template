@@ -51,7 +51,7 @@
         -t $CI_REGISTRY_FULL_IMAGE .
       echo "镜像构建成功"
       
-      # 推送镜像
+      # 推送镜像（指数退避重试）
       echo "开始推送镜像..."
       PUSH_SUCCESS=false
       for i in 1 2 3; do
@@ -63,8 +63,9 @@
           if [ $i -eq 3 ]; then
             echo "推送失败，已达最大重试次数"
           else
-            echo "推送失败，2秒后重试..."
-            sleep 2
+            SLEEP=$((2 ** i))
+            echo "推送失败，${SLEEP}秒后重试..."
+            sleep $SLEEP
           fi
         fi
       done
