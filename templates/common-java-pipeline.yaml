@@ -160,9 +160,3 @@ deploy:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
   needs: ["scan"]
-  stage: scan
-  extends: .trivy_scan
-  image: docker:cli
-  services:
-    - docker:dind
-  needs: ["build"]
