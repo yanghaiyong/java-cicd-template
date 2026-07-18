@@ -147,4 +147,4 @@ build:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  needs: ["scan"]
+  needs: ["build"]
