@@ -24,6 +24,7 @@ include:
     file: 'jobs/common_java/deploy.yaml'
   - project: 'cidevops/java-cicd-template'
     ref: master
+    file: 'jobs/common_java/scan.yaml'
 
 variables:
   # ============================================
@@ -33,13 +34,13 @@ variables:
   DOCKER_IMAGE: "docker:cli"
   KUBECTL_IMAGE: "bitnami/kubectl:latest"
   SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
-  
+
   # ============================================
   # 通用 CI 变量
   # ============================================
   CI_DEBUG_TRACE: "false"
   GIT_CHECKOUT: "true"
-  
+
   # ============================================
   # Maven 构建相关变量
   # ============================================
@@ -48,12 +49,12 @@ variables:
   JUNIT_REPORT_PATH: 'target/surefire-reports/'
   JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
-  
+
   # 构建产物目录
   CACHE_DIR: 'target/'
   ARTIFACTS: 'target/'
   ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
-  
+
   # ============================================
   # Docker 相关变量
   # ============================================
@@ -65,24 +66,24 @@ variables:
   CI_REGISTRY: "k8s-node-1:5000"
   CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
   CI_REGISTRY_FULL_IMAGE: "$CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
-  
+
   # ============================================
   # K8s 部署相关变量
   APP_NAME: "$CI_PROJECT_NAME"
-  
+
   # K8s 路径配置
   K8S_BASE_PATH: "src/main/k8s"
   K8S_ENV: "dev"
   K8S_FILE: "deploy.yaml"
-  
+
   # K8s 默认配置 (可被 rules 覆盖)
   K8S_NAMESPACE: 'app-${K8S_ENV}'
-  
+
   # K8s 资源配置 (可在 k8s yaml 中使用)
   REPLICAS: "1"
   MAX_SURGE: "1"
   MAX_UNAVAILABLE: "0"
-  
+
   # 容器配置
   SERVICE_TYPE: "ClusterIP"
   SERVICE_PORT: "8080"
@@ -92,22 +93,22 @@ variables:
   # Docker Registry 认证配置（base64编码的 dockerconfigjson）
   # 格式: echo -n '{"auths":{"k8s-node-1:5000":{"auth":"YWRtaW46YWRtaW4="}}}' | base64 -w 0
   DOCKER_CONFIG: "eyJhdXRocyI6eyJrOHMtbm9kZS0xOjUwMDAiOnsiYXV0aCI6IllXUnRhVzQ2WVdSdGFXND0ifX19"
-  
+
   # 资源配置
   MEMORY_REQUEST: "256Mi"
   CPU_REQUEST: "200m"
   MEMORY_LIMIT: "512Mi"
   CPU_LIMIT: "1000m"
-  
+
   # 健康检查
   HEALTH_CHECK_PATH: "/actuator/health"
   LIVENESS_INITIAL_DELAY: "60"
   READINESS_INITIAL_DELAY: "30"
-  
+
   # Java堆内存配置
   JAVA_MIN_HEAP: "256m"
   JAVA_MAX_HEAP: "512m"
-  
+
   # HPA配置
   HPA_MIN_REPLICAS: "1"
   HPA_MAX_REPLICAS: "2"
@@ -124,6 +125,7 @@ stages:
   - package
   - test
   - build
+  - scan
   - deploy
 
 package:
@@ -142,9 +144,20 @@ build:
   extends: .docker_build
   image: $DOCKER_IMAGE
   needs: ["package"]
+
+deploy:
   stage: deploy
   extends: .k8s_deploy
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
   needs: ["build"]
+
+trivy_scan:
+  stage: scan
+  extends: .trivy_scan
+  image: docker:cli
+  services:
+    - docker:dind
+  needs: ["build"]
+
