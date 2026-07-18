@@ -124,15 +124,29 @@
       sed -i "s|\${JAVA_MAX_HEAP}|$JAVA_MAX_HEAP|g" $K8S_YAML
       echo "变量替换完成"
       
-      # 创建 namespace
+      # 先 dry-run 验证 YAML 语法
+      echo "验证 YAML 语法..."
+      if ! kubectl apply --dry-run=client -f $K8S_YAML -n ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        echo "错误: YAML 验证失败，请检查配置文件"
+        kubectl apply --dry-run=client -f $K8S_YAML -n ${K8S_NAMESPACE} 2>&1 || true
+        exit 1
+      fi
+      echo "YAML 验证通过"
+      
+      # 创建 namespace（如不存在）
       if ! kubectl get namespace ${K8S_NAMESPACE} >/dev/null 2>&1; then
         kubectl create namespace ${K8S_NAMESPACE}
       fi
       
-      # 部署应用（包含 Secret、ConfigMap、Deployment 等）
-      kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}
-      
-      if [ $? -ne 0 ]; then
+      # 部署应用
+      if kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}; then
+        echo "部署成功，等待就绪..."
+        if kubectl rollout status deployment/${APP_NAME} -n ${K8S_NAMESPACE} --timeout=120s; then
+          echo "应用已就绪"
+        else
+          echo "警告: rollout 超时，请手动检查 Pod 状态"
+        fi
+      else
         echo "部署失败！"
         exit 1
       fi
