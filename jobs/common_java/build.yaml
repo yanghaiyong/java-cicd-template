@@ -84,7 +84,7 @@
       fi
       
       echo "清理本地镜像: $CI_REGISTRY_FULL_IMAGE"
-      docker rmi -f $CI_REGISTRY_FULL_IMAGE || true
+      #docker rmi -f $CI_REGISTRY_FULL_IMAGE || true
   after_script:
     - |
       echo "========================================="
