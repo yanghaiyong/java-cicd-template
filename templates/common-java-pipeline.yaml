@@ -145,15 +145,21 @@ build:
   image: $DOCKER_IMAGE
   needs: ["package"]
 
+trivy_scan:
+  stage: scan
+  extends: .trivy_scan
+  image: docker:cli
+  services:
+    - docker:dind
+  needs: ["build"]
+
 deploy:
   stage: deploy
   extends: .k8s_deploy
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  needs: ["build"]
-
-trivy_scan:
+  needs: ["scan"]
   stage: scan
   extends: .trivy_scan
   image: docker:cli
