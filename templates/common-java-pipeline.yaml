@@ -22,6 +22,9 @@ include:
   - project: 'cidevops/java-cicd-template'
     ref: master
     file: 'jobs/common_java/deploy.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java/scan.yaml'
 
 variables:
   # ============================================
@@ -122,6 +125,7 @@ stages:
   - package
   - test
   - build
+  - scan
   - deploy
 
 package:
@@ -147,4 +151,12 @@ deploy:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
+  needs: ["build"]
+
+trivy_scan:
+  stage: scan
+  extends: .trivy_scan
+  image: docker:cli
+  services:
+    - docker:dind
   needs: ["build"]
