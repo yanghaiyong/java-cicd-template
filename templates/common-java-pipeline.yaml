@@ -144,13 +144,10 @@ build:
   extends: .docker_build
   image: $DOCKER_IMAGE
   needs: ["package"]
-
 trivy_scan:
   stage: scan
   extends: .trivy_scan
   image: docker:cli
-  services:
-    - docker:dind
   needs: ["build"]
 
 deploy:
