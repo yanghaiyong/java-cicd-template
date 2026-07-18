@@ -34,22 +34,10 @@
       echo "镜像名称: $CI_REGISTRY_FULL_IMAGE"
       echo "========================================="
       
-      # Docker 登录（DOCKER_AUTH_CONFIG 优先级更高，设为时跳过）
+      # Docker 认证：DOCKER_AUTH_CONFIG 由 GitLab CI 自动注入 ~/.docker/config.json
+      # docker login 已弃用，改用 DOCKER_AUTH_CONFIG（见 Docker 私服安装教程）
       if [ -z "$DOCKER_AUTH_CONFIG" ]; then
-        if [ -z "$CI_REGISTRY_USER" ] || [ -z "$CI_REGISTRY_PASSWORD" ]; then
-          echo "错误: 未配置 DOCKER_AUTH_CONFIG 且 CI_REGISTRY_USER/PASSWORD 为空"
-          exit 1
-        fi
-        for i in 1 2 3; do
-          echo "Docker 登录尝试 $i/3..."
-          docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && break || {
-            if [ $i -eq 3 ]; then echo "Docker 登录失败"; exit 1; fi
-            echo "登录失败，2秒后重试..."
-            sleep 2
-          }
-        done
-      else
-        echo "使用 DOCKER_AUTH_CONFIG 认证（跳过 docker login）"
+        echo "警告: 未配置 DOCKER_AUTH_CONFIG，docker push 可能失败"
       fi
       
       # 构建镜像
