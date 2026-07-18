@@ -24,7 +24,6 @@ include:
     file: 'jobs/common_java/deploy.yaml'
   - project: 'cidevops/java-cicd-template'
     ref: master
-    file: 'jobs/common_java/scan.yaml'
 
 variables:
   # ============================================
@@ -125,7 +124,6 @@ stages:
   - package
   - test
   - build
-  - scan
   - deploy
 
 package:
@@ -144,13 +142,6 @@ build:
   extends: .docker_build
   image: $DOCKER_IMAGE
   needs: ["package"]
-trivy_scan:
-  stage: scan
-  extends: .trivy_scan
-  image: docker:cli
-  needs: ["build"]
-
-deploy:
   stage: deploy
   extends: .k8s_deploy
   image:
