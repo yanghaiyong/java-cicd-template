@@ -153,11 +153,3 @@ deploy:
     entrypoint: [ "" ]
   needs: ["build"]
 
-trivy_scan:
-  stage: scan
-  extends: .trivy_scan
-  image: docker:cli
-  services:
-    - docker:dind
-  needs: ["build"]
-
