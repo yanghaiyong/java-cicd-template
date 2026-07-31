@@ -50,6 +50,16 @@ variables:
   JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
 
+  # ============================================
+  # Nexus3 Maven 仓库集成（可选）
+  # 配置了 NEXUS_MAVEN_URL 后，CI 会动态生成 settings.xml 走 Nexus3
+  # 变量值在 GitLab 实例级设置（Admin Area → Settings → CI/CD → Variables）
+  # 如需回退到项目自带 settings.xml，删除下方 NEXUS_* 变量即可
+  # ============================================
+  # NEXUS_MAVEN_URL: "http://nexus3.nexus3-ns.svc:8081/repository/maven-public/"
+  # NEXUS_USERNAME: "ci-deploy"
+  # NEXUS_PASSWORD: ""
+
   # 构建产物目录
   CACHE_DIR: 'target/'
   ARTIFACTS: 'target/'

@@ -21,6 +21,55 @@
       mkdir -p .m2/repository
       echo "工作目录: $(pwd)"
       echo "磁盘空间: $(df -h . | tail -1)"
+      # ==========================================
+      # Nexus3 Maven 仓库集成
+      # 如果配置了 NEXUS_MAVEN_URL，则动态生成 settings.xml 走 Nexus3
+      # 未配置时保留项目自带 settings.xml（原逻辑）
+      # 如需回退，删除以下 NEXUS 相关代码块即可
+      # ==========================================
+      if [ -n "$NEXUS_MAVEN_URL" ]; then
+        echo "检测到 Nexus3 配置，生成 Maven settings.xml..."
+        cat > settings.xml << NEXUSEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <servers>
+    <server>
+      <id>nexus-central</id>
+      <username>${NEXUS_USERNAME}</username>
+      <password>${NEXUS_PASSWORD}</password>
+    </server>
+    <server>
+      <id>nexus-releases</id>
+      <username>${NEXUS_USERNAME}</username>
+      <password>${NEXUS_PASSWORD}</password>
+    </server>
+    <server>
+      <id>nexus-snapshots</id>
+      <username>${NEXUS_USERNAME}</username>
+      <password>${NEXUS_PASSWORD}</password>
+    </server>
+  </servers>
+  <mirrors>
+    <mirror>
+      <id>nexus-central</id>
+      <mirrorOf>*</mirrorOf>
+      <name>Nexus3 Maven Public</name>
+      <url>${NEXUS_MAVEN_URL}</url>
+    </mirror>
+  </mirrors>
+</settings>
+NEXUSEOF
+        echo "settings.xml 已生成，Nexus3: $NEXUS_MAVEN_URL"
+      else
+        # 原逻辑：使用项目自带的 settings.xml
+        if [ ! -f settings.xml ]; then
+          echo "警告: 项目无 settings.xml 且未配置 Nexus3，使用 Maven 默认配置"
+        else
+          echo "使用项目自带 settings.xml"
+        fi
+      fi
   script:
     - $BUILD_SHELL
   after_script:
