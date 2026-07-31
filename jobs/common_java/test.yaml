@@ -20,12 +20,15 @@
       mvn -version 2>&1 | head -1
       # ==========================================
       # Nexus3 Maven 仓库集成（与 package.yaml 保持一致）
-      # 如果配置了 NEXUS_MAVEN_URL，则动态生成 settings.xml 走 Nexus3
+      # 优先使用 NEXUS_MAVEN_URL（SVC 内部地址），为空则用 NEXUS_MAVEN_URL_EXT（外部域名）
+      # 两个都未配置时保留项目自带 settings.xml（原逻辑）
       # 未配置时保留项目自带 settings.xml（原逻辑）
       # 如需回退，删除以下 NEXUS 相关代码块即可
       # ==========================================
-      if [ -n "$NEXUS_MAVEN_URL" ]; then
+      NEXUS_URL="${NEXUS_MAVEN_URL:-$NEXUS_MAVEN_URL_EXT}"
+      if [ -n "$NEXUS_URL" ]; then
         echo "检测到 Nexus3 配置，生成 Maven settings.xml..."
+        echo "Nexus 地址: $NEXUS_URL"
         cat > settings.xml << NEXUSEOF
       <?xml version="1.0" encoding="UTF-8"?>
       <settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
@@ -53,12 +56,12 @@
             <id>nexus-central</id>
             <mirrorOf>*</mirrorOf>
             <name>Nexus3 Maven Public</name>
-            <url>${NEXUS_MAVEN_URL}</url>
+            <url>${NEXUS_URL}</url>
           </mirror>
         </mirrors>
       </settings>
       NEXUSEOF
-        echo "settings.xml 已生成，Nexus3: $NEXUS_MAVEN_URL"
+        echo "settings.xml 已生成，Nexus3: $NEXUS_URL"
       else
         # 原逻辑：使用项目自带的 settings.xml
         if [ ! -f settings.xml ]; then
