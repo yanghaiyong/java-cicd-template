@@ -43,18 +43,20 @@ variables:
 
   # ============================================
   # Maven 构建相关变量
+  # CI 使用 Nexus3 统一 settings.xml（Runner 挂载 /etc/maven/settings.xml）
+  # 本地开发仍用项目自带 settings.xml，互不影响
   # ============================================
-  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
-  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s /etc/maven/settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s /etc/maven/settings.xml'
   JUNIT_REPORT_PATH: 'target/surefire-reports/'
   JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
 
   # ============================================
-  # Nexus3 Maven 仓库集成（可选）
-  # 配置了 NEXUS_MAVEN_URL 后，CI 会动态生成 settings.xml 走 Nexus3
-  # 变量值在 GitLab 实例级设置（Admin Area → Settings → CI/CD → Variables）
-  # 如需回退到项目自带 settings.xml，删除下方 NEXUS_* 变量即可
+  # Nexus3 Maven 仓库集成（ConfigMap 方式）
+  # settings.xml 由 Runner 挂载 ConfigMap: nexus-maven-settings → /etc/maven/
+  # 不再动态生成，集中管理，所有项目自动生效
+  # 如需回退到项目自带 settings.xml，把 BUILD_SHELL/TEST_SHELL 改回 -s settings.xml
   # ============================================
   # NEXUS_MAVEN_URL: "http://nexus3.nexus3-ns.svc:8081/repository/maven-public/"
   # NEXUS_USERNAME: "ci-deploy"

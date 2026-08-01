@@ -22,55 +22,24 @@
       echo "工作目录: $(pwd)"
       echo "磁盘空间: $(df -h . | tail -1)"
       # ==========================================
-      # Nexus3 Maven 仓库集成
-      # 优先使用 NEXUS_MAVEN_URL（SVC 内部地址），为空则用 NEXUS_MAVEN_URL_EXT（外部域名）
-      # 两个都未配置时保留项目自带 settings.xml（原逻辑）
-      # 如需回退，删除以下 NEXUS 相关代码块即可
+      # Nexus3 Maven 仓库集成（ConfigMap 方式）
+      # settings.xml 由 Runner 挂载：nexus-maven-settings → /etc/maven/settings.xml
+      # 所有 CI Job 自动使用，无需动态生成
+      # 如需回退到项目自带 settings.xml：
+      #   1. 把 BUILD_SHELL/TEST_SHELL 改回 -s settings.xml
+      #   2. 删除下方引用 /etc/maven 的检查即可
       # ==========================================
-      NEXUS_URL="${NEXUS_MAVEN_URL:-$NEXUS_MAVEN_URL_EXT}"
-      if [ -n "$NEXUS_URL" ]; then
-        echo "检测到 Nexus3 配置，生成 Maven settings.xml..."
-        echo "Nexus 地址: $NEXUS_URL"
-        cat > settings.xml << NEXUSEOF
-      <?xml version="1.0" encoding="UTF-8"?>
-      <settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
-        <servers>
-          <server>
-            <id>nexus-central</id>
-            <username>${NEXUS_USERNAME}</username>
-            <password>${NEXUS_PASSWORD}</password>
-          </server>
-          <server>
-            <id>nexus-releases</id>
-            <username>${NEXUS_USERNAME}</username>
-            <password>${NEXUS_PASSWORD}</password>
-          </server>
-          <server>
-            <id>nexus-snapshots</id>
-            <username>${NEXUS_USERNAME}</username>
-            <password>${NEXUS_PASSWORD}</password>
-          </server>
-        </servers>
-        <mirrors>
-          <mirror>
-            <id>nexus-central</id>
-            <mirrorOf>*</mirrorOf>
-            <name>Nexus3 Maven Public</name>
-            <url>${NEXUS_URL}</url>
-          </mirror>
-        </mirrors>
-      </settings>
-      NEXUSEOF
-        echo "settings.xml 已生成，Nexus3: $NEXUS_MAVEN_URL"
+      if [ -f /etc/maven/settings.xml ]; then
+        echo "使用 Nexus3 统一配置: /etc/maven/settings.xml"
+        echo "Nexus 地址: $(grep -o '<url>[^<]*</url>' /etc/maven/settings.xml | head -1 | sed 's/<[^>]*>//g')"
       else
-        # 原逻辑：使用项目自带的 settings.xml
+        # 原逻辑：使用项目自带的 settings.xml（未挂载 ConfigMap 时）
         if [ ! -f settings.xml ]; then
-          echo "警告: 项目无 settings.xml 且未配置 Nexus3，使用 Maven 默认配置"
+          echo "警告: 项目无 settings.xml 且未挂载 Nexus3 配置，使用 Maven 默认配置"
         else
           echo "使用项目自带 settings.xml"
         fi
+      fi
       fi
   script:
     - $BUILD_SHELL
