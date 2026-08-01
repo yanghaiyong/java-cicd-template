@@ -40,7 +40,6 @@
           echo "使用项目自带 settings.xml"
         fi
       fi
-      fi
   script:
     - $BUILD_SHELL
   after_script:
