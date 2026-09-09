@@ -6,14 +6,17 @@
 
 ```
 java-cicd-template/
-├── jobs/                           # CI/CD Job 模板定义
-│   ├── build.yaml                  # Docker 镜像构建模板
-│   ├── deploy.yaml                 # Kubernetes 部署模板
-│   ├── package.yaml                # Maven 构建打包模板
-│   └── test.yaml                   # Java 测试模板
-├── templates/                      # 流水线模板
-│   └── java-pipeline.yaml          # 主 CI/CD 流水线配置
-└── README.md                       # 本文档
+├── jobs/                              # CI/CD Job 模板定义
+│   ├── package.yaml                   # 单体 Maven 构建 (向后兼容)
+│   ├── test.yaml                      # 单体测试 (向后兼容)
+│   ├── build.yaml                     # 单体 Docker 构建 (向后兼容)
+│   ├── deploy.yaml                    # 单体 K8s 部署 (向后兼容)
+│   ├── aggregate.yaml                 # 聚合项目专用 (矩阵构建 + 增量触发)
+│   └── debug-cert.yaml                # 证书调试
+├── templates/                         # 流水线模板
+│   ├── java-pipeline.yaml             # 单体项目入口 (向后兼容)
+│   └── java-pipeline-aggregate.yaml   # 聚合项目入口 (新增 v1.0)
+└── README.md                          # 本文档
 ```
 
 ## 🚀 快速开始
@@ -99,39 +102,177 @@ GitLab 内置变量可直接使用:
 
 ## 🔄 流水线阶段
 
+### 单体项目 (java-pipeline.yaml)
+
 | 阶段 | 说明 | Job 名称 | 触发条件 |
 |------|------|----------|----------|
+| **debug-cert** | 证书调试 | `debug-cert` | 所有分支和标签 |
 | **package** | Maven 编译打包 | `mvn_build` | 所有分支和标签 |
 | **test** | 单元测试 + 覆盖率 | `test` | 所有分支和标签 |
 | **build** | Docker 镜像构建并推送 | `docker_upload` | master 分支或 tags |
 | **deploy** | Kubernetes 部署 | `k8s_deploy` | master 分支 (需上游 job 完成) |
 
+### 聚合项目 (java-pipeline-aggregate.yaml)
+
+| 阶段 | 说明 | Job 名称 | 触发条件 |
+|------|------|----------|----------|
+| **validate** | 全项目编译验证 | `aggregate:compile` | 所有分支和 MR |
+| **test** | 单元测试 (matrix) | `aggregate:test` × N | 所有分支和 MR |
+| **build** | Docker 构建 (matrix) | `aggregate:build` × N | main 分支 / tag + rules:changes |
+| **deploy** | K8s 部署 (matrix) | `aggregate:deploy` × N | tag 自动 / main 手动 |
+
 ## 📦 Job 模板详解
 
-### jobs/package.yaml - Maven 构建
+### jobs/package.yaml - Maven 构建(单体)
 
 - **模板名称**: `.mvn_build`
 - **功能**: Maven 编译打包，包含缓存优化和自动重试
 - **产物**: JAR 文件保存 30 天
 - **缓存**: Maven 本地仓库 `.m2/repository`
 
-### jobs/test.yaml - 测试
+### jobs/test.yaml - 测试(单体)
 
 - **模板名称**: `.test`
 - **功能**: 执行单元测试和 JaCoCo 覆盖率统计
 - **报告**: JUnit XML 报告 + JaCoCo 覆盖率报告
 
-### jobs/build.yaml - Docker 构建
+### jobs/build.yaml - Docker 构建(单体)
 
 - **模板名称**: `.docker_build_base` / `.docker_upload`
 - **功能**: 构建并推送 Docker 镜像到 Registry
 - **特性**: 自动重试、缓存优化、多标签支持
 
-### jobs/deploy.yaml - K8s 部署
+### jobs/deploy.yaml - K8s 部署(单体)
 
 - **模板名称**: `.k8s_deploy`
 - **功能**: 部署应用到 Kubernetes 集群
 - **特性**: 自动 namespace 创建、部署验证、回滚支持
+
+---
+
+## 🆕 聚合项目支持 (v1.0+)
+
+### 适用场景
+
+聚合项目(微服务架构)与单体项目有本质区别:
+- **单体**: 1 个 APP_NAME、1 个 K8s YAML、1 个镜像
+- **聚合**: N 个可部署应用(8+)、N 个 K8s YAMLs、N 个镜像
+
+### 特性
+
+| 特性 | 说明 |
+|------|------|
+| **parallel:matrix** | 8 个应用并行构建/部署 |
+| **rules:changes** | 基础库变更自动触发依赖应用,只构建变更部分 |
+| **统一部署** | 8 个独立 K8s YAML,共享模板只差镜像 tag |
+| **复用单体变量** | 镜像/标签策略完全一致,降低学习成本 |
+
+### 快速开始
+
+在 SpringBootLearning 类聚合项目 `.gitlab-ci.yml`:
+
+```yaml
+include:
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'templates/java-pipeline-aggregate.yaml'
+
+variables:
+  # 镜像仓库
+  CI_REGISTRY: harbor-ui.master.com
+  CI_REGISTRY_IMAGE: springboot        # 项目名
+  CI_REGISTRY_USER: $HARBOR_ROBOT_USER
+  CI_REGISTRY_PASSWORD: $HARBOR_ROBOT_PASSWORD
+
+  # 部署
+  K8S_NAMESPACE: app-pre-prod
+  KUBECONFIG_CONTENT: $KUBECONFIG_CONTENT
+```
+
+**注意**:模板内置了 SpringBootStarry 8 个微服务的 matrix 配置。如果你的项目结构不同,需要 fork 模板并修改 `templates/java-pipeline-aggregate.yaml` 中的 matrix。
+
+### 流水线架构
+
+```
+validate (compile 全项目)
+    ↓
+matrix.test (8 个并行,各 app 单独测试)
+    ↓
+matrix.build (8 个并行,基于 rules:changes 增量)
+    ↓
+matrix.deploy (8 个并行,tag 触发或手动)
+```
+
+### Job 模板详解 (aggregate.yaml)
+
+| 模板名 | 功能 | 关键变量 |
+|--------|------|----------|
+| `.aggregate_maven_compile` | 全项目编译验证 | - |
+| `.aggregate_mvn_build` | 单 app Maven 构建,带 `-am` 依赖 | `APP_NAME`, `APP_MAVEN_PATH` |
+| `.aggregate_test` | 单 app 单元测试 + JaCoCo | `APP_NAME`, `APP_MAVEN_PATH` |
+| `.aggregate_docker_build` | 单 app Docker 构建 + push Harbor | `APP_NAME`, `APP_MAVEN_PATH`, `IMAGE_TAG` |
+| `.aggregate_k8s_deploy` | 单 app K8s 部署(`kubectl set image`) | `APP_NAME`, `K8S_NAMESPACE` |
+
+### 镜像命名规则
+
+聚合项目下每个 app 镜像命名格式:
+```
+$CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$IMAGE_TAG
+```
+
+例如:`harbor-ui.master.com/springboot/starry-gateway:v1.0.0`
+
+### 部署文件组织
+
+每个 app 需在项目仓库准备独立的 K8s YAML:
+```
+项目根/
+├── k8s/
+│   ├── starry-gateway.yaml         # APP_NAME=starry-gateway
+│   ├── starry-datacenter.yaml      # APP_NAME=starry-datacenter
+│   ├── starry-admin.yaml           # APP_NAME=starry-admin
+│   ├── starry-api.yaml             # APP_NAME=starry-api
+│   ├── starry-auth.yaml            # APP_NAME=starry-auth
+│   ├── starry-oauth-server.yaml    # APP_NAME=starry-oauth-server
+│   ├── starry-oauth-resource.yaml  # APP_NAME=starry-oauth-resource
+│   └── starry-sentinel.yaml        # APP_NAME=starry-sentinel
+└── SpringBootStarry/
+    ├── StarryGateway/
+    │   └── src/main/docker/Dockerfile   # Dockerfile 路径约定
+    └── ...
+```
+
+### 触发逻辑
+
+| 触发源 | 行为 |
+|--------|------|
+| MR / feature 分支 | 仅 validate + test(不构建镜像) |
+| main push | validate + test + build(增量构建变更的 app)|
+| tag (v*.*.*) | validate + test + build + deploy(全部构建并部署)|
+
+### 增量触发规则
+
+构建阶段 (`aggregate:build`) 使用 `rules:changes`:
+- 基础库路径变更(`StarryCommon/**` 等)→ **所有 app 重建**
+- 单 app 源码变更 → 仅该 app 重建
+- 仅文档/无关文件 → 不触发构建
+
+### 自定义矩阵
+
+如果项目结构与 SpringBootStarry 不同,需 fork 模板并修改 matrix:
+
+```yaml
+# templates/java-pipeline-aggregate.yaml (自定义版本)
+aggregate:test:
+  extends: .aggregate_test
+  parallel: 4
+  matrix:
+    - APP_NAME: "my-service-a"
+      APP_MAVEN_PATH: "services/service-a"
+    - APP_NAME: "my-service-b"
+      APP_MAVEN_PATH: "services/service-b"
+    # 添加你的应用...
+```
 
 ## 🌿 分支策略
 
