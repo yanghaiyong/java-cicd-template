@@ -6,17 +6,27 @@
 
 ```
 java-cicd-template/
-├── jobs/                              # CI/CD Job 模板定义
-│   ├── package.yaml                   # 单体 Maven 构建 (向后兼容)
-│   ├── test.yaml                      # 单体测试 (向后兼容)
-│   ├── build.yaml                     # 单体 Docker 构建 (向后兼容)
-│   ├── deploy.yaml                    # 单体 K8s 部署 (向后兼容)
-│   ├── aggregate.yaml                 # 聚合项目专用 (矩阵构建 + 增量触发)
-│   └── debug-cert.yaml                # 证书调试
-├── templates/                         # 流水线模板
-│   ├── java-pipeline.yaml             # 单体项目入口 (向后兼容)
-│   └── java-pipeline-aggregate.yaml   # 聚合项目入口 (新增 v1.0)
-└── README.md                          # 本文档
+├── jobs/                                # CI/CD Job 模板定义
+│   ├── common_java/                     # 单体 Java 项目 (4 阶段)
+│   │   ├── package.yaml                 #   Maven 构建
+│   │   ├── test.yaml                    #   单元测试 + JaCoCo
+│   │   ├── build.yaml                   #   Docker 构建 + 推送
+│   │   ├── deploy.yaml                  #   K8s 部署 (多环境分支)
+│   │   └── scan.yaml                    #   Trivy 镜像扫描
+│   ├── common_aggregate/                # 聚合项目 (4 阶段, 新增 v1.0)
+│   │   ├── package.yaml                 #   Maven 构建 (矩阵, 带 -am 依赖)
+│   │   ├── test.yaml                    #   单元测试 (矩阵)
+│   │   ├── build.yaml                   #   Docker 构建 + 推送 (矩阵)
+│   │   ├── deploy.yaml                  #   K8s 部署 (矩阵 + 多环境分支)
+│   │   └── scan.yaml                    #   Trivy 镜像扫描 (矩阵)
+│   ├── common_vue/                      # Vue 前端项目
+│   └── debug-cert.yaml                  # 证书调试
+├── templates/                           # 流水线模板
+│   ├── java-pipeline.yaml               # 单体项目入口 (向后兼容)
+│   ├── java-pipeline-aggregate.yaml     # 聚合项目入口 (v1.0)
+│   ├── common-java-pipeline.yaml        # 单体公共入口
+│   └── common-vue-pipeline.yaml         # Vue 入口
+└── README.md
 ```
 
 ## 🚀 快速开始
