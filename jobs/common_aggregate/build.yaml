@@ -118,13 +118,15 @@
       failed_apps=""
       for app_path in $DEPLOYABLE_APPS; do
         app_name=$(basename "$app_path")
+        # Docker 镜像名必须小写
+        app_name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
         echo ""
         echo "========================================="
         echo "构建镜像: $app_name ($app_path)"
         echo "========================================="
 
-        # 计算镜像路径
-        CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$app_name"
+        # 计算镜像路径 (使用小写名称)
+        CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$app_name_lower"
         CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
         echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
 

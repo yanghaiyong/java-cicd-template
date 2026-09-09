@@ -62,6 +62,8 @@
       echo "逐个扫描所有应用的镜像..."
       for app_path in $DEPLOYABLE_APPS; do
         app_name=$(basename "$app_path")
+        # Docker 镜像名必须小写
+        app_name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
         echo ""
         echo "========================================="
         echo "扫描: $app_name"
@@ -73,7 +75,7 @@
         else
           IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
         fi
-        CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$app_name"
+        CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$app_name_lower"
         CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
         echo "扫描镜像: $CI_REGISTRY_FULL_IMAGE"
 
