@@ -119,29 +119,21 @@ aggregate:compile:
     - if: '$CI_COMMIT_TAG'
 
 # =============================================================================
-# 阶段 2: 单元测试 (parallel:matrix 8 并行)
+# 阶段 2: 单元测试 (线性顺序,避免并行 job 超出集群 quota)
 # =============================================================================
 aggregate:test:
-  extends: .aggregate_test
+  extends: .aggregate_test_all
   image: $MAVEN_IMAGE
-  parallel:
-    matrix:
-      - APP_NAME: "starry-gateway"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-      - APP_NAME: "starry-datacenter"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-      - APP_NAME: "starry-admin"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-      - APP_NAME: "starry-api"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-      - APP_NAME: "starry-auth"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-      - APP_NAME: "starry-oauth-server"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-      - APP_NAME: "starry-oauth-resource"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-      - APP_NAME: "starry-sentinel"
-        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+      SpringBootStarry/StarrySentinel
   needs: ["aggregate:compile"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'

@@ -8,6 +8,7 @@
 #   - 支持 parallel:matrix 测试多个 app
 #   - 每个 app 单独测试
 
+# 单 app 测试模板 (matrix 中每个 job 单独调用)
 .aggregate_test:
   stage: test
   retry:
@@ -35,6 +36,56 @@
     paths:
       - $APP_MAVEN_PATH/target/surefire-reports/
       - $APP_MAVEN_PATH/target/site/jacoco/
+  cache:
+    policy: pull-push
+    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository
+
+# 全部 app 线性测试模板 (资源不足时使用,顺序执行,避免并行 job 超出集群 quota)
+.aggregate_test_all:
+  stage: test
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目测试(线性) - App 列表: $DEPLOYABLE_APPS"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      java -version 2>&1 | head -1
+      mvn --version 2>&1 | head -1
+      mkdir -p .m2/repository
+  script:
+    - |
+      echo "逐个测试所有可部署应用..."
+      failed_apps=""
+      for app_path in $DEPLOYABLE_APPS; do
+        app_name=$(basename "$app_path")
+        echo ""
+        echo "========================================="
+        echo "测试: $app_name ($app_path)"
+        echo "========================================="
+        if $TEST_SHELL -pl "$app_path" -am; then
+          echo "✓ 测试通过: $app_name"
+        else
+          echo "✗ 测试失败: $app_name"
+          failed_apps="$failed_apps $app_name"
+        fi
+      done
+      echo ""
+      echo "========================================="
+      echo "测试汇总"
+      echo "========================================="
+      if [ -n "$failed_apps" ]; then
+        echo "失败的应用:$failed_apps"
+        exit 1
+      else
+        echo "全部测试通过!"
+      fi
   cache:
     policy: pull-push
     key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
