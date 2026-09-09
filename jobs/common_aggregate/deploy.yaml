@@ -1,0 +1,143 @@
+# ============================================
+# 聚合项目 (Maven Multi-Module) K8s 部署模板
+# ============================================
+# 适用场景: 聚合项目,包含多个可部署应用/微服务
+# 设计原则: 100% 复用 common_java/deploy.yaml 的设计
+#
+# 与 common_java/deploy.yaml 的区别:
+#   - 支持 parallel:matrix 部署多个 app
+#   - K8s YAML 路径: $APP_MAVEN_PATH/src/main/k8s/<env>/deploy.yaml
+#   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$TAG
+
+.aggregate_k8s_deploy:
+  stage: deploy
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  # 多环境自动分支识别 (与 common_java/deploy.yaml 一致)
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        K8S_ENV: "dev"
+        K8S_NAMESPACE: "app-dev"
+    - if: '$CI_COMMIT_BRANCH == "test"'
+      variables:
+        K8S_ENV: "test"
+        K8S_NAMESPACE: "app-test"
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"'
+      variables:
+        K8S_ENV: "pre-prod"
+        K8S_NAMESPACE: "app-pre-prod"
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        K8S_ENV: "prod"
+        K8S_NAMESPACE: "app-prod"
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目 K8s 部署 - $APP_NAME"
+      echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
+      echo "========================================="
+      # 拼接 K8s YAML 路径: $APP_MAVEN_PATH/src/main/k8s/<env>/deploy.yaml
+      export K8S_YAML="${APP_MAVEN_PATH}/src/main/k8s/${K8S_ENV}/deploy.yaml"
+      echo "K8s YAML: $K8S_YAML"
+      # Kubeconfig 认证 (context 优先, content 备用)
+      if [ -n "$KUBECONFIG_CONTEXT" ]; then
+        echo "使用 KUBECONFIG_CONTEXT: $KUBECONFIG_CONTEXT"
+        export KUBECONFIG=""
+        kubectl config use-context $KUBECONFIG_CONTEXT
+      elif [ -n "$KUBECONFIG_CONTENT" ]; then
+        echo "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
+        chmod 600 /tmp/kubeconfig
+        export KUBECONFIG=/tmp/kubeconfig
+      else
+        echo "错误: KUBECONFIG_CONTEXT 或 KUBECONFIG_CONTENT 未配置"
+        exit 1
+      fi
+      kubectl version --client
+  script:
+    - |
+      export K8S_YAML="${APP_MAVEN_PATH}/src/main/k8s/${K8S_ENV}/deploy.yaml"
+
+      # 镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      fi
+      CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+      echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
+
+      # 检查 K8s YAML
+      if [ ! -f "$K8S_YAML" ]; then
+        echo "错误: K8s YAML 不存在: $K8S_YAML"
+        exit 1
+      fi
+
+      # sed 替换所有变量 (与 common_java/deploy.yaml 完全一致)
+      if [ -z "$DOCKER_CONFIG" ]; then
+        sed -i "/^---$/,/^kind: Secret/d" $K8S_YAML
+        sed -i "/imagePullSecrets:/d" $K8S_YAML
+      else
+        sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
+        sed -i "s|\${DOCKER_CONFIG}|$DOCKER_CONFIG|g" $K8S_YAML
+      fi
+      sed -i "s|\${APP_NAME}|$APP_NAME|g" $K8S_YAML
+      sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
+      sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
+      sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" $K8S_YAML
+      sed -i "s|\${SERVICE_TYPE}|$SERVICE_TYPE|g" $K8S_YAML
+      sed -i "s|\${SERVICE_PORT}|$SERVICE_PORT|g" $K8S_YAML
+      sed -i "s|\${CONTAINER_PORT}|$CONTAINER_PORT|g" $K8S_YAML
+      sed -i "s|\${IMAGE_PULL_POLICY}|$IMAGE_PULL_POLICY|g" $K8S_YAML
+      sed -i "s|\${REPLICAS}|$REPLICAS|g" $K8S_YAML
+      sed -i "s|\${MAX_SURGE}|$MAX_SURGE|g" $K8S_YAML
+      sed -i "s|\${MAX_UNAVAILABLE}|$MAX_UNAVAILABLE|g" $K8S_YAML
+      sed -i "s|\${MEMORY_REQUEST}|$MEMORY_REQUEST|g" $K8S_YAML
+      sed -i "s|\${CPU_REQUEST}|$CPU_REQUEST|g" $K8S_YAML
+      sed -i "s|\${MEMORY_LIMIT}|$MEMORY_LIMIT|g" $K8S_YAML
+      sed -i "s|\${CPU_LIMIT}|$CPU_LIMIT|g" $K8S_YAML
+      sed -i "s|\${HEALTH_CHECK_PATH}|$HEALTH_CHECK_PATH|g" $K8S_YAML
+      sed -i "s|\${LIVENESS_INITIAL_DELAY}|$LIVENESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${READINESS_INITIAL_DELAY}|$READINESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${HPA_MIN_REPLICAS}|$HPA_MIN_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_MAX_REPLICAS}|$HPA_MAX_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_CPU_THRESHOLD}|$HPA_CPU_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_MEMORY_THRESHOLD}|$HPA_MEMORY_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_SCALE_DOWN_WINDOW}|$HPA_SCALE_DOWN_WINDOW|g" $K8S_YAML
+      sed -i "s|\${JAVA_MIN_HEAP}|$JAVA_MIN_HEAP|g" $K8S_YAML
+      sed -i "s|\${JAVA_MAX_HEAP}|$JAVA_MAX_HEAP|g" $K8S_YAML
+
+      # dry-run 验证
+      echo "验证 YAML 语法..."
+      if ! kubectl apply --dry-run=client -f $K8S_YAML -n ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        echo "错误: YAML 验证失败"
+        kubectl apply --dry-run=client -f $K8S_YAML -n ${K8S_NAMESPACE} 2>&1 || true
+        exit 1
+      fi
+
+      # 创建 namespace
+      if ! kubectl get namespace ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        kubectl create namespace ${K8S_NAMESPACE}
+      fi
+
+      # 部署
+      if kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}; then
+        echo "部署成功,等待就绪..."
+        if kubectl rollout status deployment/${APP_NAME} -n ${K8S_NAMESPACE} --timeout=120s; then
+          echo "应用已就绪"
+        else
+          echo "警告: rollout 超时,请手动检查 Pod 状态"
+        fi
+      else
+        echo "部署失败"
+        exit 1
+      fi
+
+      echo "部署完成!"
+      kubectl get deployments -n ${K8S_NAMESPACE}
+      kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME}
+  needs: ["build"]

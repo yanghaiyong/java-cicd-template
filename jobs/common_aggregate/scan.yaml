@@ -1,0 +1,42 @@
+# ============================================
+# 聚合项目 (Maven Multi-Module) Trivy 镜像扫描模板
+# ============================================
+# 适用场景: 聚合项目,包含多个可部署应用/微服务
+# 设计原则: 复用 common_java/scan.yaml 的所有设计
+#
+# 与 common_java/scan.yaml 的区别:
+#   - 支持 parallel:matrix 扫描多个 app 的镜像
+#   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$TAG
+
+.aggregate_trivy_scan:
+  stage: scan
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "Trivy 安全扫描 - $APP_NAME"
+      echo "========================================="
+  script:
+    - |
+      # 镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      fi
+      CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+      echo "扫描镜像: $CI_REGISTRY_FULL_IMAGE"
+      # 宽松模式: 仅报告不阻断 (与 common_java/scan.yaml 一致)
+      docker run --rm aquasec/trivy:latest \
+        image \
+        --severity CRITICAL,HIGH \
+        --no-progress \
+        --exit-code 0 \
+        "$CI_REGISTRY_FULL_IMAGE"
+      echo "扫描完成"
+  needs: ["build"]

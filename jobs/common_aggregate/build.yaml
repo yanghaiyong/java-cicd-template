@@ -1,0 +1,84 @@
+# ============================================
+# 聚合项目 (Maven Multi-Module) Docker 镜像构建模板
+# ============================================
+# 适用场景: 聚合项目,包含多个可部署应用/微服务
+# 设计原则: 复用 common_java/build.yaml 的所有设计
+#
+# 与 common_java/build.yaml 的区别:
+#   - 支持 parallel:matrix 构建多个 app 的镜像
+#   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$TAG
+
+.aggregate_docker_build:
+  stage: build
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目 Docker 构建 - $APP_NAME"
+      echo "Maven 模块: $APP_MAVEN_PATH"
+      echo "========================================="
+      docker version
+      # 计算镜像标签 (与 common_java 一致: tag→v*, 其他→branch-sha)
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+        echo "正式发布 - 使用 Tag: $IMAGE_TAG"
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+        echo "非生产环境 - 使用分支标签: $IMAGE_TAG"
+      fi
+      # 镜像名: $CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$TAG
+      CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+      echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
+      # DOCKER_AUTH_CONFIG 由 GitLab CI 自动注入 ~/.docker/config.json
+      if [ -z "$DOCKER_AUTH_CONFIG" ]; then
+        echo "警告: 未配置 DOCKER_AUTH_CONFIG，docker push 可能失败"
+      fi
+  script:
+    - |
+      # 计算镜像路径
+      CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+
+      # 构建镜像
+      DOCKERFILE_PATH_CALC="$APP_MAVEN_PATH/src/main/docker/Dockerfile"
+      [ -f "$DOCKERFILE_PATH_CALC" ] || DOCKERFILE_PATH_CALC="Dockerfile"
+      echo "Dockerfile: $DOCKERFILE_PATH_CALC"
+
+      docker build \
+        --force-rm \
+        --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+        --build-arg VCS_REF=$CI_COMMIT_SHA \
+        --build-arg VERSION=$IMAGE_TAG \
+        -f "$DOCKERFILE_PATH_CALC" \
+        -t "$CI_REGISTRY_FULL_IMAGE" \
+        $APP_MAVEN_PATH
+
+      # 推送镜像 (指数退避重试,与 common_java 一致)
+      PUSH_SUCCESS=false
+      for i in 1 2 3; do
+        echo "推送尝试 $i/3..."
+        if docker push "$CI_REGISTRY_FULL_IMAGE"; then
+          PUSH_SUCCESS=true
+          break
+        else
+          if [ $i -eq 3 ]; then
+            echo "推送失败,已达最大重试次数"
+          else
+            SLEEP=$((2 ** i))
+            echo "推送失败,${SLEEP}秒后重试..."
+            sleep $SLEEP
+          fi
+        fi
+      done
+
+      if [ "$PUSH_SUCCESS" = true ]; then
+        echo "镜像推送成功: $CI_REGISTRY_FULL_IMAGE"
+      else
+        exit 1
+      fi
+  needs: ["package"]

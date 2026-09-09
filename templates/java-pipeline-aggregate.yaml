@@ -30,7 +30,19 @@
 include:
   - project: 'cidevops/java-cicd-template'
     ref: master
-    file: 'jobs/common_java/aggregate.yaml'
+    file: 'jobs/common_aggregate/package.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate/test.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate/build.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate/scan.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate/deploy.yaml'
 
 stages:
   - package
