@@ -26,8 +26,7 @@
       mvn test jacoco:report -B \
         -Dmaven.repo.local=.m2/repository \
         -pl "$APP_MAVEN_PATH" -am \
-        -f pom.xml \
-        ${MAVEN_SETTINGS:+-s settings.xml}
+        -f pom.xml -s settings.xml
   artifacts:
     when: always
     expire_in: 7 days

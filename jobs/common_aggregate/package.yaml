@@ -33,8 +33,7 @@
         -Dmaven.repo.local=.m2/repository \
         -Dmaven.javadoc.skip=true \
         -pl "$APP_MAVEN_PATH" -am \
-        -f pom.xml \
-        ${MAVEN_SETTINGS:+-s settings.xml}
+        -f pom.xml -s settings.xml
   after_script:
     - |
       echo "构建产物:"
@@ -70,8 +69,7 @@
         -Dcheckstyle.skip=true \
         -Dmaven.javadoc.skip=true \
         -Dmaven.repo.local=.m2/repository \
-        -f pom.xml \
-        ${MAVEN_SETTINGS:+-s settings.xml}
+        -f pom.xml -s settings.xml
   cache:
     policy: pull-push
     key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
