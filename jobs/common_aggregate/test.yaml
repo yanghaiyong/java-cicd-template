@@ -23,10 +23,7 @@
       mkdir -p .m2/repository
   script:
     - |
-      mvn test jacoco:report -B \
-        -Dmaven.repo.local=.m2/repository \
-        -pl "$APP_MAVEN_PATH" -am \
-        -f pom.xml -s settings.xml
+      $TEST_SHELL -pl "$APP_MAVEN_PATH" -am
   artifacts:
     when: always
     expire_in: 7 days

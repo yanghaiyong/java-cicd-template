@@ -29,11 +29,7 @@
   script:
     - |
       echo "构建模块: $APP_MAVEN_PATH"
-      mvn clean package -B -DskipTests \
-        -Dmaven.repo.local=.m2/repository \
-        -Dmaven.javadoc.skip=true \
-        -pl "$APP_MAVEN_PATH" -am \
-        -f pom.xml -s settings.xml
+      $BUILD_SHELL -pl "$APP_MAVEN_PATH" -am
   after_script:
     - |
       echo "构建产物:"
@@ -64,7 +60,7 @@
   script:
     - |
       echo "全项目编译验证"
-      mvn -B -ntp -T 1C compile \
+      mvn compile -B -ntp -T 1C \
         -DskipTests \
         -Dcheckstyle.skip=true \
         -Dmaven.javadoc.skip=true \
