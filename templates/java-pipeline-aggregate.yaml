@@ -1,51 +1,47 @@
-# =============================================================================
-# Java 聚合项目 CI/CD 流水线模板 (java-pipeline-aggregate.yaml)
-# =============================================================================
-# 适用场景:
-#   - Maven 多模块聚合项目 (SpringBootStarry 类)
-#   - 多个可部署应用/微服务 (8+ 个)
-#   - 需要增量构建 (基础库变更自动触发依赖应用)
+# ============================================
+# 通用 Java 聚合项目 CI/CD 流水线模板 (v1.0)
+# ============================================
+# 适用场景: Maven 多模块聚合项目 (SpringBootStarry 类)
 #
-# 使用方式 (SpringBootLearning 为例):
+# 设计原则: 100% 复用 common_java 的所有设计
+#   - DOCKER_AUTH_CONFIG (而非 docker login)
+#   - sed 变量替换 ${VAR}
+#   - 多环境分支策略 (develop→dev / test→test / master→pre-prod / tag→prod)
+#   - 镜像 TAG: tag 用 v*, 其他用 branch-sha
+#   - 镜像仓库: 默认 k8s-node-1:5000 (集群本地 registry)
+#
+# 使用方式:
 #   .gitlab-ci.yml:
 #     include:
 #       - project: 'cidevops/java-cicd-template'
 #         ref: master
 #         file: 'templates/java-pipeline-aggregate.yaml'
-#     
-#     variables:
-#       APPS_MATRIX: |
-#         - {name: "starry-gateway",    maven_path: "SpringBootStarry/StarryGateway"}
-#         - {name: "starry-datacenter", maven_path: "SpringBootStarry/StarryDataCenter"}
-#         ...
-#       BASE_LIB_PATHS: |
-#         - SpringBootStarry/StarryCommon/**
-#         - SpringBootStarry/StarryConfig/**
-#         - SpringBootStarry/StarryStarter/**
-#         - SpringBootStarry/pom.xml
-#         - pom.xml
-#       CI_REGISTRY: harbor-ui.master.com
-#       CI_REGISTRY_IMAGE: springboot
-#       K8S_NAMESPACE: app-pre-prod
 #
-# 流水线架构:
-#   validate (编译验证) → matrix.test (8 并行) → matrix.build (8 并行) → matrix.deploy (8 并行)
+#     variables:
+#       CI_REGISTRY: harbor-ui.master.com        # 覆盖默认 k8s-node-1:5000
+#       CI_REGISTRY_IMAGE: springboot
+#       KUBECONFIG_CONTEXT: my-cluster-context   # 或 KUBECONFIG_CONTENT
+#
+# 文件组织约定 (与 common_java 一致):
+#   <APP_MAVEN_PATH>/src/main/k8s/<env>/deploy.yaml
+#   例: SpringBootStarry/StarryGateway/src/main/k8s/pre-prod/deploy.yaml
 # =============================================================================
 
 include:
   - project: 'cidevops/java-cicd-template'
     ref: master
-    file: 'jobs/aggregate.yaml'
+    file: 'jobs/common_java/aggregate.yaml'
 
 stages:
-  - validate
+  - package
   - test
   - build
+  - scan
   - deploy
 
 variables:
   # ============================================
-  # 镜像变量 (与单体模板一致)
+  # 镜像变量 (与 common_java 一致)
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
   DOCKER_IMAGE: "docker:24.0.7-dind"
@@ -53,29 +49,69 @@ variables:
   SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
 
   # ============================================
-  # 默认值 (使用方需覆盖)
+  # 镜像仓库 (默认集群本地 registry,可覆盖)
   # ============================================
   CI_REGISTRY: "k8s-node-1:5000"
-  CI_REGISTRY_IMAGE: ""          # 镜像项目,如 springboot
-  K8S_NAMESPACE: "default"
-  CI_REGISTRY_USER: "admin"
-  CI_REGISTRY_PASSWORD: "admin"
+  CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
+
+  # ============================================
+  # Maven 默认值
+  # ============================================
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+
+  # ============================================
+  # K8s 配置
+  # ============================================
+  SERVICE_TYPE: "ClusterIP"
+  SERVICE_PORT: "8080"
+  CONTAINER_PORT: "8080"
+  IMAGE_PULL_POLICY: "Always"
+  IMAGE_PULL_SECRETS: "docker-secret"
+  REPLICAS: "1"
+  MAX_SURGE: "1"
+  MAX_UNAVAILABLE: "0"
+
+  # 资源
+  MEMORY_REQUEST: "256Mi"
+  CPU_REQUEST: "200m"
+  MEMORY_LIMIT: "512Mi"
+  CPU_LIMIT: "1000m"
+
+  # 健康检查
+  HEALTH_CHECK_PATH: "/actuator/health"
+  LIVENESS_INITIAL_DELAY: "60"
+  READINESS_INITIAL_DELAY: "30"
+
+  # Java 堆
+  JAVA_MIN_HEAP: "256m"
+  JAVA_MAX_HEAP: "512m"
+
+  # HPA
+  HPA_MIN_REPLICAS: "1"
+  HPA_MAX_REPLICAS: "2"
+  HPA_CPU_THRESHOLD: "70"
+  HPA_MEMORY_THRESHOLD: "80"
+  HPA_SCALE_DOWN_WINDOW: "300"
 
 # =============================================================================
-# 阶段 1: 全项目编译验证 (validate)
+# 阶段 1: 全项目编译验证
 # =============================================================================
 aggregate:compile:
   extends: .aggregate_maven_compile
+  image: $MAVEN_IMAGE
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH'
     - if: '$CI_COMMIT_TAG'
 
 # =============================================================================
-# 阶段 2: 单元测试 (test) - parallel:matrix 8 并行
+# 阶段 2: 单元测试 (parallel:matrix 8 并行)
 # =============================================================================
 aggregate:test:
   extends: .aggregate_test
+  image: $MAVEN_IMAGE
   parallel: 8
   matrix:
     - APP_NAME: "starry-gateway"
@@ -101,11 +137,11 @@ aggregate:test:
     - if: '$CI_COMMIT_TAG'
 
 # =============================================================================
-# 阶段 3: Docker 镜像构建 (build) - parallel:matrix 8 并行
-# 增量触发: 基础库变更触发所有 app,单独 app 变更只触发该 app
+# 阶段 3: Maven package (matrix 8 并行 - 每个 app 单独构建)
 # =============================================================================
-aggregate:build:
-  extends: .aggregate_docker_build
+aggregate:package:
+  extends: .aggregate_mvn_package
+  image: $MAVEN_IMAGE
   parallel: 8
   matrix:
     - APP_NAME: "starry-gateway"
@@ -124,13 +160,10 @@ aggregate:build:
       APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
     - APP_NAME: "starry-sentinel"
       APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
-  needs:
-    - aggregate:compile
-    - job: "aggregate:test"
-      optional: true
+  needs: ["aggregate:compile"]
   # 增量触发: 基础库 OR 本 app 源码变更
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
       changes:
         # 基础库变更触发所有 app
         - SpringBootStarry/StarryCommon/**/*
@@ -143,10 +176,11 @@ aggregate:build:
         - "${APP_MAVEN_PATH}/pom.xml"
 
 # =============================================================================
-# 阶段 4: Kubernetes 部署 (deploy) - parallel:matrix 8 并行
+# 阶段 4: Docker 镜像构建 (matrix 8 并行,基于 package)
 # =============================================================================
-aggregate:deploy:
-  extends: .aggregate_k8s_deploy
+aggregate:build:
+  extends: .aggregate_docker_build
+  image: $DOCKER_IMAGE
   parallel: 8
   matrix:
     - APP_NAME: "starry-gateway"
@@ -165,13 +199,72 @@ aggregate:deploy:
       APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
     - APP_NAME: "starry-sentinel"
       APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
-  needs:
-    - job: "aggregate:build"
-      optional: true
+  needs: ["job:aggregate:package", "job:aggregate:test"]
+  # 复用 common_java/build.yaml 的触发逻辑
   rules:
-    # tag 触发自动部署
-    - if: '$CI_COMMIT_TAG'
-    # main 分支手动部署
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"'
-      when: manual
-      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+      changes:
+        - SpringBootStarry/StarryCommon/**/*
+        - SpringBootStarry/StarryConfig/**/*
+        - SpringBootStarry/StarryStarter/**/*
+        - SpringBootStarry/pom.xml
+        - pom.xml
+        - "${APP_MAVEN_PATH}/**/*"
+        - "${APP_MAVEN_PATH}/pom.xml"
+
+# =============================================================================
+# 阶段 5: Trivy 镜像扫描 (matrix 8 并行)
+# =============================================================================
+aggregate:scan:
+  extends: .aggregate_trivy_scan
+  image: $DOCKER_IMAGE
+  parallel: 8
+  matrix:
+    - APP_NAME: "starry-gateway"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
+    - APP_NAME: "starry-datacenter"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
+    - APP_NAME: "starry-admin"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
+    - APP_NAME: "starry-api"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
+    - APP_NAME: "starry-auth"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
+    - APP_NAME: "starry-oauth-server"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
+    - APP_NAME: "starry-oauth-resource"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
+    - APP_NAME: "starry-sentinel"
+      APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  needs: ["job:aggregate:build"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+
+# =============================================================================
+# 阶段 6: Kubernetes 部署 (matrix 8 并行,基于分支自动识别环境)
+# =============================================================================
+aggregate:deploy:
+  extends: .aggregate_k8s_deploy
+  image:
+    name: $KUBECTL_IMAGE
+    entrypoint: [ "" ]
+  parallel: 8
+  matrix:
+    - APP_NAME: "starry-gateway"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
+    - APP_NAME: "starry-datacenter"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
+    - APP_NAME: "starry-admin"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
+    - APP_NAME: "starry-api"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
+    - APP_NAME: "starry-auth"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
+    - APP_NAME: "starry-oauth-server"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
+    - APP_NAME: "starry-oauth-resource"
+      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
+    - APP_NAME: "starry-sentinel"
+      APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  needs: ["job:aggregate:build", "job:aggregate:scan"]
+  # deploy.yaml 中 rules 已被 aggregate_k8s_deploy 内部定义
