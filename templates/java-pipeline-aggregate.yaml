@@ -211,7 +211,7 @@ aggregate:build:
         APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
       - APP_NAME: "starry-sentinel"
         APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
-  needs: ["job:aggregate:package", "job:aggregate:test"]
+  needs: ["aggregate:package", "aggregate:test"]
   # 复用 common_java/build.yaml 的触发逻辑
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
@@ -248,7 +248,7 @@ aggregate:scan:
         APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
       - APP_NAME: "starry-sentinel"
         APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
-  needs: ["job:aggregate:build"]
+  needs: ["aggregate:build"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
 
@@ -278,5 +278,5 @@ aggregate:deploy:
         APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
       - APP_NAME: "starry-sentinel"
         APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
-  needs: ["job:aggregate:build", "job:aggregate:scan"]
+  needs: ["aggregate:build", "aggregate:scan"]
   # deploy.yaml 中 rules 已被 aggregate_k8s_deploy 内部定义
