@@ -124,24 +124,24 @@ aggregate:compile:
 aggregate:test:
   extends: .aggregate_test
   image: $MAVEN_IMAGE
-  parallel: 8
-  matrix:
-    - APP_NAME: "starry-gateway"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-    - APP_NAME: "starry-datacenter"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-    - APP_NAME: "starry-admin"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-    - APP_NAME: "starry-api"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-    - APP_NAME: "starry-auth"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-    - APP_NAME: "starry-oauth-server"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-    - APP_NAME: "starry-oauth-resource"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-    - APP_NAME: "starry-sentinel"
-      APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  parallel:
+    matrix:
+      - APP_NAME: "starry-gateway"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
+      - APP_NAME: "starry-datacenter"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
+      - APP_NAME: "starry-admin"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
+      - APP_NAME: "starry-api"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
+      - APP_NAME: "starry-auth"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
+      - APP_NAME: "starry-oauth-server"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
+      - APP_NAME: "starry-oauth-resource"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
+      - APP_NAME: "starry-sentinel"
+        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
   needs: ["aggregate:compile"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -154,24 +154,24 @@ aggregate:test:
 aggregate:package:
   extends: .aggregate_mvn_package
   image: $MAVEN_IMAGE
-  parallel: 8
-  matrix:
-    - APP_NAME: "starry-gateway"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-    - APP_NAME: "starry-datacenter"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-    - APP_NAME: "starry-admin"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-    - APP_NAME: "starry-api"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-    - APP_NAME: "starry-auth"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-    - APP_NAME: "starry-oauth-server"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-    - APP_NAME: "starry-oauth-resource"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-    - APP_NAME: "starry-sentinel"
-      APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  parallel:
+    matrix:
+      - APP_NAME: "starry-gateway"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
+      - APP_NAME: "starry-datacenter"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
+      - APP_NAME: "starry-admin"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
+      - APP_NAME: "starry-api"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
+      - APP_NAME: "starry-auth"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
+      - APP_NAME: "starry-oauth-server"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
+      - APP_NAME: "starry-oauth-resource"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
+      - APP_NAME: "starry-sentinel"
+        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
   needs: ["aggregate:compile"]
   # 增量触发: 基础库 OR 本 app 源码变更
   rules:
@@ -193,24 +193,24 @@ aggregate:package:
 aggregate:build:
   extends: .aggregate_docker_build
   image: $DOCKER_IMAGE
-  parallel: 8
-  matrix:
-    - APP_NAME: "starry-gateway"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-    - APP_NAME: "starry-datacenter"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-    - APP_NAME: "starry-admin"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-    - APP_NAME: "starry-api"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-    - APP_NAME: "starry-auth"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-    - APP_NAME: "starry-oauth-server"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-    - APP_NAME: "starry-oauth-resource"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-    - APP_NAME: "starry-sentinel"
-      APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  parallel:
+    matrix:
+      - APP_NAME: "starry-gateway"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
+      - APP_NAME: "starry-datacenter"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
+      - APP_NAME: "starry-admin"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
+      - APP_NAME: "starry-api"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
+      - APP_NAME: "starry-auth"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
+      - APP_NAME: "starry-oauth-server"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
+      - APP_NAME: "starry-oauth-resource"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
+      - APP_NAME: "starry-sentinel"
+        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
   needs: ["job:aggregate:package", "job:aggregate:test"]
   # 复用 common_java/build.yaml 的触发逻辑
   rules:
@@ -230,24 +230,24 @@ aggregate:build:
 aggregate:scan:
   extends: .aggregate_trivy_scan
   image: $DOCKER_IMAGE
-  parallel: 8
-  matrix:
-    - APP_NAME: "starry-gateway"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-    - APP_NAME: "starry-datacenter"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-    - APP_NAME: "starry-admin"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-    - APP_NAME: "starry-api"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-    - APP_NAME: "starry-auth"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-    - APP_NAME: "starry-oauth-server"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-    - APP_NAME: "starry-oauth-resource"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-    - APP_NAME: "starry-sentinel"
-      APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  parallel:
+    matrix:
+      - APP_NAME: "starry-gateway"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
+      - APP_NAME: "starry-datacenter"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
+      - APP_NAME: "starry-admin"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
+      - APP_NAME: "starry-api"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
+      - APP_NAME: "starry-auth"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
+      - APP_NAME: "starry-oauth-server"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
+      - APP_NAME: "starry-oauth-resource"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
+      - APP_NAME: "starry-sentinel"
+        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
   needs: ["job:aggregate:build"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
@@ -260,23 +260,23 @@ aggregate:deploy:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  parallel: 8
-  matrix:
-    - APP_NAME: "starry-gateway"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-    - APP_NAME: "starry-datacenter"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-    - APP_NAME: "starry-admin"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-    - APP_NAME: "starry-api"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-    - APP_NAME: "starry-auth"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-    - APP_NAME: "starry-oauth-server"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-    - APP_NAME: "starry-oauth-resource"
-      APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-    - APP_NAME: "starry-sentinel"
-      APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  parallel:
+    matrix:
+      - APP_NAME: "starry-gateway"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
+      - APP_NAME: "starry-datacenter"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
+      - APP_NAME: "starry-admin"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
+      - APP_NAME: "starry-api"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
+      - APP_NAME: "starry-auth"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
+      - APP_NAME: "starry-oauth-server"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
+      - APP_NAME: "starry-oauth-resource"
+        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
+      - APP_NAME: "starry-sentinel"
+        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
   needs: ["job:aggregate:build", "job:aggregate:scan"]
   # deploy.yaml 中 rules 已被 aggregate_k8s_deploy 内部定义
