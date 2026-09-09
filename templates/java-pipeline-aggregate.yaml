@@ -175,31 +175,22 @@ aggregate:package:
         - SpringBootStarry/StarrySentinel/**/*
 
 # =============================================================================
-# 阶段 4: Docker 镜像构建 (matrix 8 并行,基于 package)
+# 阶段 4: Docker 镜像构建 (线性顺序)
 # =============================================================================
 aggregate:build:
-  extends: .aggregate_docker_build
+  extends: .aggregate_docker_build_all
   image: $DOCKER_IMAGE
-  parallel:
-    matrix:
-      - APP_NAME: "starry-gateway"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-      - APP_NAME: "starry-datacenter"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-      - APP_NAME: "starry-admin"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-      - APP_NAME: "starry-api"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-      - APP_NAME: "starry-auth"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-      - APP_NAME: "starry-oauth-server"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-      - APP_NAME: "starry-oauth-resource"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-      - APP_NAME: "starry-sentinel"
-        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+      SpringBootStarry/StarrySentinel
   needs: ["aggregate:package", "aggregate:test"]
-  # 复用 common_java/build.yaml 的触发逻辑
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
       changes:
@@ -208,62 +199,52 @@ aggregate:build:
         - SpringBootStarry/StarryStarter/**/*
         - SpringBootStarry/pom.xml
         - pom.xml
-        - "${APP_MAVEN_PATH}/**/*"
-        - "${APP_MAVEN_PATH}/pom.xml"
+        - SpringBootStarry/StarryGateway/**/*
+        - SpringBootStarry/StarryDataCenter/**/*
+        - SpringBootStarry/StarryAdmin/**/*
+        - SpringBootStarry/StarryApi/**/*
+        - SpringBootStarry/StarryAuth/**/*
+        - SpringBootStarry/StarryOauthServer/**/*
+        - SpringBootStarry/StarryOauthResource/**/*
+        - SpringBootStarry/StarrySentinel/**/*
 
 # =============================================================================
-# 阶段 5: Trivy 镜像扫描 (matrix 8 并行)
+# 阶段 5: Trivy 镜像扫描 (线性顺序)
 # =============================================================================
 aggregate:scan:
-  extends: .aggregate_trivy_scan
+  extends: .aggregate_trivy_scan_all
   image: $DOCKER_IMAGE
-  parallel:
-    matrix:
-      - APP_NAME: "starry-gateway"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-      - APP_NAME: "starry-datacenter"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-      - APP_NAME: "starry-admin"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-      - APP_NAME: "starry-api"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-      - APP_NAME: "starry-auth"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-      - APP_NAME: "starry-oauth-server"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-      - APP_NAME: "starry-oauth-resource"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-      - APP_NAME: "starry-sentinel"
-        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+      SpringBootStarry/StarrySentinel
   needs: ["aggregate:build"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
 
 # =============================================================================
-# 阶段 6: Kubernetes 部署 (matrix 8 并行,基于分支自动识别环境)
+# 阶段 6: Kubernetes 部署 (线性顺序)
 # =============================================================================
 aggregate:deploy:
-  extends: .aggregate_k8s_deploy
+  extends: .aggregate_k8s_deploy_all
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  parallel:
-    matrix:
-      - APP_NAME: "starry-gateway"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryGateway"
-      - APP_NAME: "starry-datacenter"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryDataCenter"
-      - APP_NAME: "starry-admin"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAdmin"
-      - APP_NAME: "starry-api"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryApi"
-      - APP_NAME: "starry-auth"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryAuth"
-      - APP_NAME: "starry-oauth-server"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthServer"
-      - APP_NAME: "starry-oauth-resource"
-        APP_MAVEN_PATH: "SpringBootStarry/StarryOauthResource"
-      - APP_NAME: "starry-sentinel"
-        APP_MAVEN_PATH: "SpringBootStarry/StarrySentinel"
-  needs: ["aggregate:build", "aggregate:scan"]
-  # deploy.yaml 中 rules 已被 aggregate_k8s_deploy 内部定义
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+      SpringBootStarry/StarrySentinel
+  needs: ["aggregate:build"]
+  # deploy.yaml 中 rules 已被 aggregate_k8s_deploy_all 内部定义
