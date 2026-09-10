@@ -82,11 +82,19 @@
       echo "========================================="
       echo "全部构建完成!"
       echo "========================================="
+  # artifacts 必须声明,否则 aggregate:build 拿不到 JAR(Dockerfile COPY target/*.jar 会失败)
+  artifacts:
+    name: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    when: on_success
+    expire_in: 7 days
+    paths:
+      - SpringBootStarry/Starry*/target/*.jar
   cache:
     policy: pull-push
     key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
     paths:
       - .m2/repository
+      - SpringBootStarry/Starry*/target/
 
 # 全项目编译验证 (所有 app 依赖)
 .aggregate_maven_compile:
