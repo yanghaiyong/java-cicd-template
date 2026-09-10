@@ -129,7 +129,6 @@ variables:
     - SpringBootStarry/StarryAuth/**/*
     - SpringBootStarry/StarryOauthServer/**/*
     - SpringBootStarry/StarryOauthResource/**/*
-    - SpringBootStarry/StarrySentinel/**/*
 
 # =============================================================================
 # 阶段 1: 全项目编译验证
@@ -157,7 +156,6 @@ aggregate:test:
       SpringBootStarry/StarryAuth
       SpringBootStarry/StarryOauthServer
       SpringBootStarry/StarryOauthResource
-      SpringBootStarry/StarrySentinel
   needs: ["aggregate:compile"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -179,7 +177,6 @@ aggregate:package:
       SpringBootStarry/StarryAuth
       SpringBootStarry/StarryOauthServer
       SpringBootStarry/StarryOauthResource
-      SpringBootStarry/StarrySentinel
   needs: ["aggregate:compile"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
@@ -200,7 +197,6 @@ aggregate:build:
       SpringBootStarry/StarryAuth
       SpringBootStarry/StarryOauthServer
       SpringBootStarry/StarryOauthResource
-      SpringBootStarry/StarrySentinel
   needs: ["aggregate:package", "aggregate:test"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
@@ -221,7 +217,6 @@ aggregate:scan:
       SpringBootStarry/StarryAuth
       SpringBootStarry/StarryOauthServer
       SpringBootStarry/StarryOauthResource
-      SpringBootStarry/StarrySentinel
   needs: ["aggregate:build"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
@@ -244,7 +239,6 @@ aggregate:deploy:
       SpringBootStarry/StarryAuth
       SpringBootStarry/StarryOauthServer
       SpringBootStarry/StarryOauthResource
-      SpringBootStarry/StarrySentinel
   needs: ["aggregate:build"]
   # 覆盖继承的 rules,加入 changes 过滤(与 build 保持一致,避免 docs-only push 触发 deploy)
   rules:
