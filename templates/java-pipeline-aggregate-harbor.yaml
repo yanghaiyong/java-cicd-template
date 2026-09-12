@@ -1,0 +1,256 @@
+# ============================================
+# 通用 Java 聚合项目 CI/CD 流水线模板 (Harbor 版本)
+# ============================================
+# 适用场景: Maven 多模块聚合项目,使用 Harbor 镜像仓库 + containerd
+# 与 java-pipeline-aggregate.yaml 的区别:
+#   - 使用 kaniko 替代 dind (containerd 环境兼容)
+#   - 支持 Harbor TLS 验证
+#   - 镜像仓库: Harbor (harbor-ui.test.com)
+#
+# 使用方式:
+#   .gitlab-ci.yml:
+#     include:
+#       - project: 'cidevops/java-cicd-template'
+#         ref: master
+#         file: 'templates/java-pipeline-aggregate-harbor.yaml'
+#
+#     variables:
+#       CI_REGISTRY: harbor-ui.test.com
+#       CI_REGISTRY_IMAGE: springboot
+#       CI_REGISTRY_USER: admin
+#       CI_REGISTRY_PASSWORD: Harbor12345
+#       KUBECONFIG_CONTENT: <base64 kubeconfig>
+# =============================================================================
+
+include:
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate_harbor/package.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate_harbor/test.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate_harbor/build.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate_harbor/scan.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_aggregate_harbor/deploy.yaml'
+
+stages:
+  - package
+  - test
+  - build
+  - scan
+  - deploy
+
+variables:
+  # ============================================
+  # 镜像变量 (Harbor 版本)
+  # ============================================
+  MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
+  KANIKO_IMAGE: "gcr.io/kaniko-project/executor:debug"
+  KUBECTL_IMAGE: "bitnami/kubectl:1.30"
+
+  # ============================================
+  # 镜像仓库 (Harbor)
+  # ============================================
+  CI_REGISTRY: "harbor-ui.test.com"
+  CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
+  CI_REGISTRY_USER: "admin"
+  CI_REGISTRY_PASSWORD: "Harbor12345"
+
+  # ============================================
+  # Maven 默认值
+  # ============================================
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+
+  # ============================================
+  # K8s 配置
+  # ============================================
+  SERVICE_TYPE: "ClusterIP"
+  SERVICE_PORT: "8080"
+  CONTAINER_PORT: "8080"
+  IMAGE_PULL_POLICY: "Always"
+  REPLICAS: "1"
+  MAX_SURGE: "1"
+  MAX_UNAVAILABLE: "0"
+
+  # 资源
+  MEMORY_REQUEST: "256Mi"
+  CPU_REQUEST: "200m"
+  MEMORY_LIMIT: "512Mi"
+  CPU_LIMIT: "1000m"
+
+  # 健康检查
+  HEALTH_CHECK_PATH: "/actuator/health"
+  LIVENESS_INITIAL_DELAY: "60"
+  READINESS_INITIAL_DELAY: "30"
+
+  # Java 堆
+  JAVA_MIN_HEAP: "256m"
+  JAVA_MAX_HEAP: "512m"
+
+  # HPA
+  HPA_MIN_REPLICAS: "1"
+  HPA_MAX_REPLICAS: "2"
+  HPA_CPU_THRESHOLD: "70"
+  HPA_MEMORY_THRESHOLD: "80"
+  HPA_SCALE_DOWN_WINDOW: "300"
+
+# =============================================================================
+# 共享 changes 路径列表 (YAML anchor 复用)
+# =============================================================================
+.aggregate_change_paths_anchor_harbor:
+  stage: test
+  tags: [placeholder]
+  script: ["true"]
+  change_list: &aggregate_change_paths_harbor
+    - SpringBootStarry/StarryCommon/**/*
+    - SpringBootStarry/StarryConfig/**/*
+    - SpringBootStarry/StarryStarter/**/*
+    - SpringBootStarry/pom.xml
+    - pom.xml
+    - SpringBootStarry/StarryGateway/**/*
+    - SpringBootStarry/StarryDataCenter/**/*
+    - SpringBootStarry/StarryAdmin/**/*
+    - SpringBootStarry/StarryApi/**/*
+    - SpringBootStarry/StarryAuth/**/*
+    - SpringBootStarry/StarryOauthServer/**/*
+    - SpringBootStarry/StarryOauthResource/**/*
+
+# =============================================================================
+# 阶段 1: 全项目编译验证
+# =============================================================================
+aggregate:compile:
+  extends: .aggregate_maven_compile_harbor
+  image: $MAVEN_IMAGE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+# =============================================================================
+# 阶段 2: 单元测试 (线性顺序)
+# =============================================================================
+aggregate:test:
+  extends: .aggregate_test_all_harbor
+  image: $MAVEN_IMAGE
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+  needs: ["aggregate:compile"]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+# =============================================================================
+# 阶段 3: Maven package (线性顺序)
+# =============================================================================
+aggregate:package:
+  extends: .aggregate_mvn_package_all_harbor
+  image: $MAVEN_IMAGE
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+  needs: ["aggregate:compile"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+      changes: *aggregate_change_paths_harbor
+
+# =============================================================================
+# 阶段 4: Docker 镜像构建 (线性顺序)
+# =============================================================================
+aggregate:build:
+  extends: .aggregate_docker_build_all_harbor
+  image: $KANIKO_IMAGE
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+  needs: ["aggregate:package", "aggregate:test"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+      changes: *aggregate_change_paths_harbor
+
+# =============================================================================
+# 阶段 5: Trivy 镜像扫描 (线性顺序)
+# =============================================================================
+aggregate:scan:
+  extends: .aggregate_trivy_scan_all_harbor
+  image: $KANIKO_IMAGE
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+  needs: ["aggregate:build"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+      changes: *aggregate_change_paths_harbor
+
+# =============================================================================
+# 阶段 6: Kubernetes 部署 (线性顺序)
+# =============================================================================
+aggregate:deploy:
+  extends: .aggregate_k8s_deploy_all_harbor
+  image:
+    name: $KUBECTL_IMAGE
+    entrypoint: [ "" ]
+  variables:
+    DEPLOYABLE_APPS: >-
+      SpringBootStarry/StarryGateway
+      SpringBootStarry/StarryDataCenter
+      SpringBootStarry/StarryAdmin
+      SpringBootStarry/StarryApi
+      SpringBootStarry/StarryAuth
+      SpringBootStarry/StarryOauthServer
+      SpringBootStarry/StarryOauthResource
+  needs: ["aggregate:build"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        K8S_ENV: "dev"
+        K8S_NAMESPACE: "app-dev"
+      changes: *aggregate_change_paths_harbor
+    - if: '$CI_COMMIT_BRANCH == "test"'
+      variables:
+        K8S_ENV: "test"
+        K8S_NAMESPACE: "app-test"
+      changes: *aggregate_change_paths_harbor
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"'
+      variables:
+        K8S_ENV: "pre-prod"
+        K8S_NAMESPACE: "app-pre-prod"
+      changes: *aggregate_change_paths_harbor
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        K8S_ENV: "prod"
+        K8S_NAMESPACE: "app-prod"
+      changes: *aggregate_change_paths_harbor

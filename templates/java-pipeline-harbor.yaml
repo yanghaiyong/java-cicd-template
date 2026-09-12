@@ -1,0 +1,162 @@
+# ============================================
+# 通用 Java 单体项目 CI/CD 流水线模板 (Harbor 版本)
+# ============================================
+# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库 + containerd
+# 与 java-pipeline.yaml 的区别:
+#   - 使用 kaniko 替代 dind (containerd 环境兼容)
+#   - 支持 Harbor TLS 验证
+#   - 镜像仓库: Harbor (harbor-ui.test.com)
+#
+# 使用方式:
+#   .gitlab-ci.yml:
+#     include:
+#       - project: 'cidevops/java-cicd-template'
+#         ref: master
+#         file: 'templates/java-pipeline-harbor.yaml'
+#
+#     variables:
+#       CI_REGISTRY: harbor-ui.test.com
+#       CI_REGISTRY_IMAGE: my-project
+#       CI_REGISTRY_USER: admin
+#       CI_REGISTRY_PASSWORD: Harbor12345
+#       KUBECONFIG_CONTENT: <base64 kubeconfig>
+# =============================================================================
+
+include:
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java_harbor/package.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java_harbor/test.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java_harbor/build.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java_harbor/deploy.yaml'
+  - project: 'cidevops/java-cicd-template'
+    ref: master
+    file: 'jobs/common_java_harbor/scan.yaml'
+
+stages:
+  - package
+  - test
+  - build
+  - scan
+  - deploy
+
+variables:
+  # ============================================
+  # 镜像变量 (Harbor 版本)
+  # ============================================
+  MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
+  KANIKO_IMAGE: "gcr.io/kaniko-project/executor:debug"
+  KUBECTL_IMAGE: "bitnami/kubectl:1.30"
+
+  # ============================================
+  # 镜像仓库 (Harbor)
+  # ============================================
+  CI_REGISTRY: "harbor-ui.test.com"
+  CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
+  CI_REGISTRY_USER: "admin"
+  CI_REGISTRY_PASSWORD: "Harbor12345"
+
+  # ============================================
+  # Maven 默认值
+  # ============================================
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+
+  # ============================================
+  # K8s 配置
+  # ============================================
+  SERVICE_TYPE: "ClusterIP"
+  SERVICE_PORT: "8080"
+  CONTAINER_PORT: "8080"
+  IMAGE_PULL_POLICY: "Always"
+  REPLICAS: "1"
+  MAX_SURGE: "1"
+  MAX_UNAVAILABLE: "0"
+
+  # 资源
+  MEMORY_REQUEST: "256Mi"
+  CPU_REQUEST: "200m"
+  MEMORY_LIMIT: "512Mi"
+  CPU_LIMIT: "1000m"
+
+  # 健康检查
+  HEALTH_CHECK_PATH: "/actuator/health"
+  LIVENESS_INITIAL_DELAY: "60"
+  READINESS_INITIAL_DELAY: "30"
+
+  # Java 堆
+  JAVA_MIN_HEAP: "256m"
+  JAVA_MAX_HEAP: "512m"
+
+# =============================================================================
+# 阶段 1: Maven 构建
+# =============================================================================
+package:
+  extends: .mvn_build_harbor
+  image: $MAVEN_IMAGE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+# =============================================================================
+# 阶段 2: 单元测试
+# =============================================================================
+test:
+  extends: .test_harbor
+  image: $MAVEN_IMAGE
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+# =============================================================================
+# 阶段 3: Docker 镜像构建
+# =============================================================================
+build:
+  extends: .docker_build_harbor
+  image: $KANIKO_IMAGE
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+
+# =============================================================================
+# 阶段 4: Trivy 镜像扫描
+# =============================================================================
+scan:
+  extends: .trivy_scan_harbor
+  image: $KANIKO_IMAGE
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+
+# =============================================================================
+# 阶段 5: Kubernetes 部署
+# =============================================================================
+deploy:
+  extends: .k8s_deploy_harbor
+  image:
+    name: $KUBECTL_IMAGE
+    entrypoint: [ "" ]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        K8S_ENV: "dev"
+        K8S_NAMESPACE: "app-dev"
+    - if: '$CI_COMMIT_BRANCH == "test"'
+      variables:
+        K8S_ENV: "test"
+        K8S_NAMESPACE: "app-test"
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"'
+      variables:
+        K8S_ENV: "pre-prod"
+        K8S_NAMESPACE: "app-pre-prod"
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        K8S_ENV: "prod"
+        K8S_NAMESPACE: "app-prod"

@@ -1,0 +1,114 @@
+# ============================================
+# 聚合项目 (Maven Multi-Module) Maven 构建模板 (Harbor 版本)
+# ============================================
+# 适用场景: 聚合项目,使用 Harbor 镜像仓库
+# 与 common_aggregate/package.yaml 的区别:
+#   - 无变化, Maven 构建与镜像仓库无关
+
+.aggregate_mvn_package_harbor:
+  stage: package
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目 Maven 构建 (Harbor 模式) - $APP_NAME"
+      echo "Maven 模块路径: $APP_MAVEN_PATH"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      java -version 2>&1 | head -1
+      mvn --version 2>&1 | head -1
+      mkdir -p .m2/repository
+  script:
+    - |
+      echo "构建模块: $APP_MAVEN_PATH"
+      $BUILD_SHELL -pl "$APP_MAVEN_PATH" -am
+  after_script:
+    - |
+      echo "构建产物:"
+      ls -lh $APP_MAVEN_PATH/target/*.jar 2>/dev/null || echo "未找到 JAR"
+  artifacts:
+    name: "$APP_NAME-$CI_COMMIT_REF_NAME"
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - $APP_MAVEN_PATH/target/*.jar
+  cache:
+    policy: pull-push
+    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository
+      - $APP_MAVEN_PATH/target/
+
+.aggregate_mvn_package_all_harbor:
+  stage: package
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目 Maven 全部构建(线性) - Harbor 模式"
+      echo "App 列表: $DEPLOYABLE_APPS"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      java -version 2>&1 | head -1
+      mvn --version 2>&1 | head -1
+      mkdir -p .m2/repository
+  script:
+    - |
+      echo "逐个构建所有可部署应用..."
+      for app_path in $DEPLOYABLE_APPS; do
+        app_name=$(basename "$app_path")
+        echo ""
+        echo "========================================="
+        echo "构建: $app_name ($app_path)"
+        echo "========================================="
+        $BUILD_SHELL -pl "$app_path" -am || { echo "构建失败: $app_path"; exit 1; }
+        echo "✓ 构建完成: $app_name"
+      done
+      echo ""
+      echo "========================================="
+      echo "全部构建完成!"
+      echo "========================================="
+  artifacts:
+    name: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    when: on_success
+    expire_in: 7 days
+    paths:
+      - SpringBootStarry/Starry*/target/*.jar
+  cache:
+    policy: pull-push
+    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository
+      - SpringBootStarry/Starry*/target/
+
+.aggregate_maven_compile_harbor:
+  stage: package
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - mkdir -p .m2/repository
+  script:
+    - |
+      echo "全项目编译验证 (Harbor 模式)"
+      mvn compile -B -ntp -T 1C \
+        -DskipTests \
+        -Dcheckstyle.skip=true \
+        -Dmaven.javadoc.skip=true \
+        -Dmaven.repo.local=.m2/repository \
+        -f pom.xml -s settings.xml
+  cache:
+    policy: pull-push
+    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository

@@ -1,0 +1,43 @@
+# ============================================
+# 单体 Java 项目 Maven 构建模板 (Harbor 版本)
+# ============================================
+# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
+# 与 common_java/package.yaml 的区别:
+#   - 无变化, Maven 构建与镜像仓库无关
+
+.mvn_build_harbor:
+  stage: package
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "Maven 构建 (Harbor 模式)"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      java -version 2>&1 | head -1
+      mvn --version 2>&1 | head -1
+      mkdir -p .m2/repository
+  script:
+    - |
+      echo "构建命令: $BUILD_SHELL"
+      $BUILD_SHELL
+  after_script:
+    - |
+      echo "构建产物:"
+      ls -lh target/*.jar 2>/dev/null || echo "未找到 JAR"
+  artifacts:
+    name: "$APP_NAME-$CI_COMMIT_REF_NAME"
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - target/*.jar
+  cache:
+    policy: pull-push
+    key: "maven-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository
+      - target/

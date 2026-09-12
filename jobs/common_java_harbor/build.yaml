@@ -1,0 +1,101 @@
+# ============================================
+# 单体 Java 项目 Docker 镜像构建模板 (Harbor 版本)
+# ============================================
+# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
+# 与 common_java/build.yaml 的区别:
+#   - 使用 kaniko 替代 dind (containerd 环境兼容)
+#   - 支持 Harbor TLS 验证
+#   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE:$TAG
+
+.docker_build_harbor:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "Docker 镜像构建 (Harbor 模式)"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      # 计算镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+        echo "正式发布 - 使用 Tag: $IMAGE_TAG"
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+        echo "非生产环境 - 使用分支标签: $IMAGE_TAG"
+      fi
+      export IMAGE_TAG
+      # 镜像地址
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+      echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
+      # 创建 Docker 认证目录
+      mkdir -p /kaniko/.docker
+  script:
+    - |
+      # 创建 Docker 配置文件 (Harbor 认证)
+      echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+      # 构建并推送镜像
+      /kaniko/executor \
+        --context=$CI_PROJECT_DIR \
+        --dockerfile=$CI_PROJECT_DIR/Dockerfile \
+        --destination=$CI_REGISTRY_FULL_IMAGE \
+        --cache=true \
+        --cache-repo=$CI_REGISTRY/$CI_REGISTRY_IMAGE/cache \
+        --skip-tls-verify=true
+  needs: ["package"]
+
+.docker_build_and_scan_harbor:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "Docker 镜像构建 + Trivy 扫描 (Harbor 模式)"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      # 计算镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      fi
+      export IMAGE_TAG
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+      echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
+      mkdir -p /kaniko/.docker
+  script:
+    - |
+      # 创建 Docker 配置文件
+      echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+      # 构建并推送镜像
+      /kaniko/executor \
+        --context=$CI_PROJECT_DIR \
+        --dockerfile=$CI_PROJECT_DIR/Dockerfile \
+        --destination=$CI_REGISTRY_FULL_IMAGE \
+        --cache=true \
+        --cache-repo=$CI_REGISTRY/$CI_REGISTRY_IMAGE/cache \
+        --skip-tls-verify=true
+      # Trivy 扫描
+      wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.52.0/trivy_0.52.0_Linux-64bit.tar.gz
+      tar -xzf /tmp/trivy.tar.gz -C /tmp
+      /tmp/trivy image \
+        --severity CRITICAL,HIGH \
+        --no-progress \
+        --exit-code 0 \
+        "$CI_REGISTRY_FULL_IMAGE" || true
+      echo "扫描完成"
+  needs: ["package"]

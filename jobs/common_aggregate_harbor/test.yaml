@@ -1,0 +1,90 @@
+# ============================================
+# 聚合项目 (Maven Multi-Module) 测试模板 (Harbor 版本)
+# ============================================
+# 适用场景: 聚合项目,使用 Harbor 镜像仓库
+# 与 common_aggregate/test.yaml 的区别:
+#   - 无变化, 测试与镜像仓库无关
+
+.aggregate_test_harbor:
+  stage: test
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目测试 (Harbor 模式) - $APP_NAME"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      mkdir -p .m2/repository
+  script:
+    - |
+      $TEST_SHELL -pl "$APP_MAVEN_PATH" -am
+  artifacts:
+    when: always
+    expire_in: 7 days
+    reports:
+      junit: $APP_MAVEN_PATH/target/surefire-reports/TEST-*.xml
+      coverage_report:
+        coverage_format: jacoco
+        path: $APP_MAVEN_PATH/target/site/jacoco/jacoco.xml
+    paths:
+      - $APP_MAVEN_PATH/target/surefire-reports/
+      - $APP_MAVEN_PATH/target/site/jacoco/
+  cache:
+    policy: pull-push
+    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository
+
+.aggregate_test_all_harbor:
+  stage: test
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目测试(线性) - Harbor 模式"
+      echo "App 列表: $DEPLOYABLE_APPS"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      java -version 2>&1 | head -1
+      mvn --version 2>&1 | head -1
+      mkdir -p .m2/repository
+  script:
+    - |
+      echo "逐个测试所有可部署应用..."
+      failed_apps=""
+      for app_path in $DEPLOYABLE_APPS; do
+        app_name=$(basename "$app_path")
+        echo ""
+        echo "========================================="
+        echo "测试: $app_name ($app_path)"
+        echo "========================================="
+        if $TEST_SHELL -pl "$app_path" -am; then
+          echo "✓ 测试通过: $app_name"
+        else
+          echo "✗ 测试失败: $app_name"
+          failed_apps="$failed_apps $app_name"
+        fi
+      done
+      echo ""
+      echo "========================================="
+      echo "测试汇总"
+      echo "========================================="
+      if [ -n "$failed_apps" ]; then
+        echo "失败的应用:$failed_apps"
+        exit 1
+      else
+        echo "全部测试通过!"
+      fi
+  cache:
+    policy: pull-push
+    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    paths:
+      - .m2/repository

@@ -1,0 +1,99 @@
+# ============================================
+# 聚合项目 (Maven Multi-Module) Trivy 镜像扫描模板 (Harbor 版本)
+# ============================================
+# 适用场景: 聚合项目,使用 Harbor 镜像仓库
+# 与 common_aggregate/scan.yaml 的区别:
+#   - 使用 kaniko 镜像内的 trivy
+#   - 支持 Harbor TLS 验证
+
+.aggregate_trivy_scan_harbor:
+  stage: scan
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "Trivy 安全扫描 (Harbor 模式) - $APP_NAME"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+  script:
+    - |
+      # 镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      fi
+      CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+      echo "扫描镜像: $CI_REGISTRY_FULL_IMAGE"
+      # 安装 Trivy
+      wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.52.0/trivy_0.52.0_Linux-64bit.tar.gz
+      tar -xzf /tmp/trivy.tar.gz -C /tmp
+      # 宽松模式: 仅报告不阻断
+      /tmp/trivy image \
+        --severity CRITICAL,HIGH \
+        --no-progress \
+        --exit-code 0 \
+        "$CI_REGISTRY_FULL_IMAGE" || true
+      echo "扫描完成"
+  needs: ["build"]
+
+.aggregate_trivy_scan_all_harbor:
+  stage: scan
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "Trivy 安全扫描(线性) - Harbor 模式"
+      echo "App 列表: $DEPLOYABLE_APPS"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+  script:
+    - |
+      echo "逐个扫描所有应用的镜像..."
+      for app_path in $DEPLOYABLE_APPS; do
+        app_name=$(basename "$app_path")
+        app_name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
+        echo ""
+        echo "========================================="
+        echo "扫描: $app_name"
+        echo "========================================="
+        # 镜像标签
+        if [ -n "$CI_COMMIT_TAG" ]; then
+          IMAGE_TAG=$CI_COMMIT_TAG
+        else
+          IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+        fi
+        CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$app_name_lower"
+        CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+        echo "扫描镜像: $CI_REGISTRY_FULL_IMAGE"
+        # 安装 Trivy
+        wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.52.0/trivy_0.52.0_Linux-64bit.tar.gz
+        tar -xzf /tmp/trivy.tar.gz -C /tmp
+        # 宽松模式: 仅报告不阻断
+        /tmp/trivy image \
+          --severity CRITICAL,HIGH \
+          --no-progress \
+          --exit-code 0 \
+          "$CI_REGISTRY_FULL_IMAGE" || true
+        echo "✓ 扫描完成: $app_name"
+      done
+      echo ""
+      echo "========================================="
+      echo "全部扫描完成!"
+      echo "========================================="
+  needs: ["build"]

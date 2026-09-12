@@ -1,0 +1,99 @@
+# ============================================
+# 单体 Java 项目 K8s 部署模板 (Harbor 版本)
+# ============================================
+# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
+# 与 common_java/deploy.yaml 的区别:
+#   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE:$TAG
+#   - 支持 Harbor 镜像拉取 Secret
+
+.k8s_deploy_harbor:
+  stage: deploy
+  image:
+    name: bitnami/kubectl:latest
+    entrypoint: [""]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        K8S_ENV: "dev"
+        K8S_NAMESPACE: "app-dev"
+    - if: '$CI_COMMIT_BRANCH == "test"'
+      variables:
+        K8S_ENV: "test"
+        K8S_NAMESPACE: "app-test"
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"'
+      variables:
+        K8S_ENV: "pre-prod"
+        K8S_NAMESPACE: "app-pre-prod"
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        K8S_ENV: "prod"
+        K8S_NAMESPACE: "app-prod"
+  before_script:
+    - |
+      echo "========================================="
+      echo "K8s 部署 (Harbor 模式)"
+      echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      # Kubeconfig 认证
+      if [ -n "$KUBECONFIG_CONTEXT" ]; then
+        echo "使用 KUBECONFIG_CONTEXT: $KUBECONFIG_CONTEXT"
+        export KUBECONFIG=""
+        kubectl config use-context $KUBECONFIG_CONTEXT
+      elif [ -n "$KUBECONFIG_CONTENT" ]; then
+        echo "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
+        chmod 600 /tmp/kubeconfig
+        export KUBECONFIG=/tmp/kubeconfig
+      else
+        echo "错误: KUBECONFIG_CONTEXT 或 KUBECONFIG_CONTENT 未配置"
+        exit 1
+      fi
+      kubectl version --client
+  script:
+    - |
+      # 镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      fi
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+      echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
+      # 检查 K8s YAML
+      if [ ! -f "$K8S_YAML" ]; then
+        echo "错误: K8s YAML 不存在: $K8S_YAML"
+        exit 1
+      fi
+      # 创建 Harbor Secret (如果不存在)
+      if ! kubectl get secret harbor-secret -n ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        kubectl create secret docker-registry harbor-secret \
+          --docker-server=$CI_REGISTRY \
+          --docker-username=$CI_REGISTRY_USER \
+          --docker-password=$CI_REGISTRY_PASSWORD \
+          -n ${K8S_NAMESPACE}
+      fi
+      # sed 替换变量
+      sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
+      sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" $K8S_YAML
+      sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
+      # 部署
+      if kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}; then
+        echo "部署成功,等待就绪..."
+        if kubectl rollout status deployment/${APP_NAME} -n ${K8S_NAMESPACE} --timeout=120s; then
+          echo "应用已就绪"
+        else
+          echo "警告: rollout 超时,请手动检查 Pod 状态"
+        fi
+      else
+        echo "部署失败"
+        exit 1
+      fi
+      echo "部署完成!"
+      kubectl get deployments -n ${K8S_NAMESPACE}
+      kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME}
+  needs: ["build"]

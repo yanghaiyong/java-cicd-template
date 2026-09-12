@@ -1,0 +1,119 @@
+# ============================================
+# 聚合项目 (Maven Multi-Module) Docker 镜像构建模板 (Harbor 版本)
+# ============================================
+# 适用场景: 聚合项目,使用 Harbor 镜像仓库
+# 与 common_aggregate/build.yaml 的区别:
+#   - 使用 kaniko 替代 dind (containerd 环境兼容)
+#   - 支持 Harbor TLS 验证
+#   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$TAG
+
+.aggregate_docker_build_harbor:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目 Docker 构建 (Harbor 模式) - $APP_NAME"
+      echo "Maven 模块: $APP_MAVEN_PATH"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      # 计算镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+        echo "正式发布 - 使用 Tag: $IMAGE_TAG"
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+        echo "非生产环境 - 使用分支标签: $IMAGE_TAG"
+      fi
+      export IMAGE_TAG
+      # 镜像名: $CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$TAG
+      CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+      echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
+      mkdir -p /kaniko/.docker
+  script:
+    - |
+      # 创建 Docker 配置文件 (Harbor 认证)
+      echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+      # 构建并推送镜像
+      /kaniko/executor \
+        --context=$CI_PROJECT_DIR/$APP_MAVEN_PATH \
+        --dockerfile=$CI_PROJECT_DIR/$APP_MAVEN_PATH/src/main/docker/Dockerfile \
+        --destination=$CI_REGISTRY_FULL_IMAGE \
+        --cache=true \
+        --cache-repo=$CI_REGISTRY/$CI_REGISTRY_IMAGE/cache \
+        --skip-tls-verify=true
+  needs: ["package"]
+
+.aggregate_docker_build_all_harbor:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  before_script:
+    - |
+      echo "========================================="
+      echo "聚合项目 Docker 全部构建(线性) - Harbor 模式"
+      echo "App 列表: $DEPLOYABLE_APPS"
+      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      # 计算镜像标签
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        IMAGE_TAG=$CI_COMMIT_TAG
+      else
+        IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+      fi
+      export IMAGE_TAG
+      mkdir -p /kaniko/.docker
+  script:
+    - |
+      # 创建 Docker 配置文件
+      echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(echo -n $CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD | base64)\"}}}" > /kaniko/.docker/config.json
+      # 逐个构建所有应用
+      failed_apps=""
+      for app_path in $DEPLOYABLE_APPS; do
+        app_name=$(basename "$app_path")
+        app_name_lower=$(echo "$app_name" | tr '[:upper:]' '[:lower:]')
+        echo ""
+        echo "========================================="
+        echo "构建镜像: $app_name ($app_path)"
+        echo "========================================="
+        CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$app_name_lower"
+        CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+        echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
+        if /kaniko/executor \
+          --context=$CI_PROJECT_DIR/$app_path \
+          --dockerfile=$CI_PROJECT_DIR/$app_path/src/main/docker/Dockerfile \
+          --destination=$CI_REGISTRY_FULL_IMAGE \
+          --cache=true \
+          --cache-repo=$CI_REGISTRY/$CI_REGISTRY_IMAGE/cache \
+          --skip-tls-verify=true; then
+          echo "✓ 构建成功: $app_name"
+        else
+          echo "✗ 构建失败: $app_name"
+          failed_apps="$failed_apps $app_name"
+        fi
+      done
+      echo ""
+      echo "========================================="
+      echo "构建汇总"
+      echo "========================================="
+      if [ -n "$failed_apps" ]; then
+        echo "失败的应用:$failed_apps"
+        exit 1
+      else
+        echo "全部构建完成!"
+      fi
+  needs: ["package"]
