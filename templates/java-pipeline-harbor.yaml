@@ -18,7 +18,7 @@
 #       CI_REGISTRY: harbor-ui.test.com
 #       CI_REGISTRY_IMAGE: my-project
 #       CI_REGISTRY_USER: admin
-#       CI_REGISTRY_PASSWORD: Harbor12345
+#       CI_REGISTRY_PASSWORD: <your-harbor-password>
 #       KUBECONFIG_CONTENT: <base64 kubeconfig>
 # =============================================================================
 
@@ -59,8 +59,8 @@ variables:
   # ============================================
   CI_REGISTRY: "harbor-ui.test.com"
   CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
-  CI_REGISTRY_USER: "admin"
-  CI_REGISTRY_PASSWORD: "Harbor12345"
+  CI_REGISTRY_USER: ""
+  CI_REGISTRY_PASSWORD: ""
 
   # ============================================
   # Maven 默认值
