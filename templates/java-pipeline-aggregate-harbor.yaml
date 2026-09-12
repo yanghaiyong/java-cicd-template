@@ -3,9 +3,9 @@
 # ============================================
 # 适用场景: Maven 多模块聚合项目,使用 Harbor 镜像仓库 + containerd
 # 与 java-pipeline-aggregate.yaml 的区别:
-#   - 使用 kaniko 替代 dind (containerd 环境兼容)
-#   - 支持 Harbor TLS 验证
+#   - 使用 Docker-in-Docker (dind) 构建镜像 (containerd 环境兼容)
 #   - 镜像仓库: Harbor (harbor-ui.test.com)
+#   - 凭据在 GitLab CI/CD Variables 中配置
 #
 # 使用方式:
 #   .gitlab-ci.yml:
@@ -51,7 +51,7 @@ variables:
   # 镜像变量 (Harbor 版本)
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
-  KANIKO_IMAGE: "gcr.io/kaniko-project/executor:debug"
+  DOCKER_IMAGE: "docker:24.0.7-dind"
   KUBECTL_IMAGE: "bitnami/kubectl:1.30"
 
   # ============================================
@@ -180,7 +180,7 @@ aggregate:package:
 # =============================================================================
 aggregate:build:
   extends: .aggregate_docker_build_all_harbor
-  image: $KANIKO_IMAGE
+  image: $DOCKER_IMAGE
   variables:
     DEPLOYABLE_APPS: >-
       SpringBootStarry/StarryGateway
@@ -200,7 +200,7 @@ aggregate:build:
 # =============================================================================
 aggregate:scan:
   extends: .aggregate_trivy_scan_all_harbor
-  image: $KANIKO_IMAGE
+  image: $DOCKER_IMAGE
   variables:
     DEPLOYABLE_APPS: >-
       SpringBootStarry/StarryGateway

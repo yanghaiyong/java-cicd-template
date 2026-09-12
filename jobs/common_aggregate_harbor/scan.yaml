@@ -2,15 +2,12 @@
 # 聚合项目 (Maven Multi-Module) Trivy 镜像扫描模板 (Harbor 版本)
 # ============================================
 # 适用场景: 聚合项目,使用 Harbor 镜像仓库
-# 与 common_aggregate/scan.yaml 的区别:
-#   - 使用 kaniko 镜像内的 trivy
-#   - 支持 Harbor TLS 验证
 
 .aggregate_trivy_scan_harbor:
   stage: scan
-  image:
-    name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [""]
+  image: docker:24.0.7-dind
+  services:
+    - docker:24.0.7-dind
   retry:
     max: 2
     when:
@@ -24,32 +21,27 @@
       echo "========================================="
   script:
     - |
-      # 镜像标签
       if [ -n "$CI_COMMIT_TAG" ]; then
         IMAGE_TAG=$CI_COMMIT_TAG
       else
         IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
       fi
-      CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
-      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$IMAGE_TAG"
       echo "扫描镜像: $CI_REGISTRY_FULL_IMAGE"
-      # 安装 Trivy
-      wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.52.0/trivy_0.52.0_Linux-64bit.tar.gz
-      tar -xzf /tmp/trivy.tar.gz -C /tmp
-      # 宽松模式: 仅报告不阻断
-      /tmp/trivy image \
+      docker run --rm aquasec/trivy:latest \
+        image \
         --severity CRITICAL,HIGH \
         --no-progress \
         --exit-code 0 \
-        "$CI_REGISTRY_FULL_IMAGE" || true
+        "$CI_REGISTRY_FULL_IMAGE"
       echo "扫描完成"
   needs: ["build"]
 
 .aggregate_trivy_scan_all_harbor:
   stage: scan
-  image:
-    name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [""]
+  image: docker:24.0.7-dind
+  services:
+    - docker:24.0.7-dind
   retry:
     max: 2
     when:
@@ -72,25 +64,20 @@
         echo "========================================="
         echo "扫描: $app_name"
         echo "========================================="
-        # 镜像标签
         if [ -n "$CI_COMMIT_TAG" ]; then
           IMAGE_TAG=$CI_COMMIT_TAG
         else
           IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
         fi
-        CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$app_name_lower"
-        CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
+        CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE/$app_name_lower:$IMAGE_TAG"
         echo "扫描镜像: $CI_REGISTRY_FULL_IMAGE"
-        # 安装 Trivy
-        wget -q -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.52.0/trivy_0.52.0_Linux-64bit.tar.gz
-        tar -xzf /tmp/trivy.tar.gz -C /tmp
-        # 宽松模式: 仅报告不阻断
-        /tmp/trivy image \
+        docker run --rm aquasec/trivy:latest \
+          image \
           --severity CRITICAL,HIGH \
           --no-progress \
           --exit-code 0 \
           "$CI_REGISTRY_FULL_IMAGE" || true
-        echo "✓ 扫描完成: $app_name"
+        echo "扫描完成: $app_name"
       done
       echo ""
       echo "========================================="
