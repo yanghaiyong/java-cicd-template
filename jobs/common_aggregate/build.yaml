@@ -112,6 +112,12 @@
       if [ -z "$DOCKER_AUTH_CONFIG" ]; then
         echo "警告: 未配置 DOCKER_AUTH_CONFIG，docker push 可能失败"
       fi
+      echo "=== DEBUG: docker config ==="
+      cat ~/.docker/config.json 2>/dev/null || echo "config.json 不存在"
+      echo "=== DEBUG: DOCKER_AUTH_CONFIG env ==="
+      echo "$DOCKER_AUTH_CONFIG" | head -c 200
+      echo ""
+      echo "=== DEBUG: HOME=$HOME ==="
   script:
     - |
       echo "逐个构建所有应用的 Docker 镜像..."
