@@ -42,6 +42,29 @@
       if [ -z "$DOCKER_AUTH_CONFIG" ]; then
         echo "警告: 未配置 DOCKER_AUTH_CONFIG，docker push 可能失败"
       fi
+      # 诊断: 检查 dind service 网络和端口
+      echo "=== 诊断: dind service 状态 ==="
+      echo "Pod 内 /etc/hosts:"
+      cat /etc/hosts | grep docker || echo "(无 docker 条目)"
+      echo "端口探测: docker:2375"
+      (echo >/dev/tcp/docker/2375) 2>/dev/null && echo "端口 2375: 开放" || echo "端口 2375: 关闭"
+      echo "=============================="
+      # 等待 Docker daemon 就绪(dind service 启动需要时间)
+      echo "等待 Docker daemon 就绪..."
+      WAIT_MAX=60
+      for i in $(seq 1 $WAIT_MAX); do
+        if docker info > /dev/null 2>&1; then
+          echo "Docker daemon 就绪 (耗时 ${i}s)"
+          break
+        fi
+        if [ $i -eq $WAIT_MAX ]; then
+          echo "错误: Docker daemon 等待超时 (${WAIT_MAX}s)"
+          echo "尝试直接连接获取更多错误信息..."
+          docker info 2>&1 || true
+          exit 1
+        fi
+        sleep 2
+      done
       docker version
   script:
     - |
