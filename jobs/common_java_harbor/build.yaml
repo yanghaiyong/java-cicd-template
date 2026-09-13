@@ -39,7 +39,11 @@
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
       # DOCKER_AUTH_CONFIG 由 GitLab CI 自动注入 ~/.docker/config.json
-      if [ -z "$DOCKER_AUTH_CONFIG" ]; then
+      # 但 dind daemon 是独立容器,需要显式 login
+      if [ -n "$DOCKER_AUTH_CONFIG" ]; then
+        echo "$DOCKER_AUTH_CONFIG" > /tmp/auth.json
+        DOCKER_CONFIG=/tmp docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" 2>&1
+      else
         echo "警告: 未配置 DOCKER_AUTH_CONFIG，docker push 可能失败"
       fi
       # 诊断: 检查 dind service 网络和端口
