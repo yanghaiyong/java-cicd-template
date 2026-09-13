@@ -15,7 +15,6 @@
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
-    DOCKER_DAEMON_ARGS: "--insecure-registry=harbor-ui.test.com"
   retry:
     max: 2
     when:
