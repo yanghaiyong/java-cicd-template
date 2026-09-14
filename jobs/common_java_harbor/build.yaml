@@ -34,10 +34,11 @@
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
       # 注入 Harbor TLS 证书 (Vault Root CA + Intermediate CA)
-      mkdir -p /home/user/.config/buildkit/certs/harbor-ui.test.com
+      # BuildKit daemon 读取 /etc/buildkit/certs/<registry>/ca.crt
+      mkdir -p /etc/buildkit/certs/harbor-ui.test.com
       cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
-         /home/user/.config/buildkit/certs/harbor-ui.test.com/ca.crt
-      echo "Harbor CA 证书已注入"
+         /etc/buildkit/certs/harbor-ui.test.com/ca.crt
+      echo "Harbor CA 证书已注入到 /etc/buildkit/certs/"
       # 配置 Harbor 认证
       mkdir -p "$DOCKER_CONFIG"
       if [ -n "$DOCKER_AUTH_CONFIG" ]; then
