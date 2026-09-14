@@ -39,15 +39,15 @@
       # 镜像地址
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
-      echo "=== DOCKER_AUTH_CONFIG 诊断 ==="
-      if [ -n "$DOCKER_AUTH_CONFIG" ]; then
-        echo "DOCKER_AUTH_CONFIG 已设置 (长度: ${#DOCKER_AUTH_CONFIG})"
-        echo "~/.docker/config.json:"
-        cat ~/.docker/config.json 2>/dev/null || echo "  文件不存在"
-      else
-        echo "DOCKER_AUTH_CONFIG 未设置!"
+      if [ -z "$DOCKER_AUTH_CONFIG" ]; then
+        echo "错误: 未配置 DOCKER_AUTH_CONFIG"
+        exit 1
       fi
-      echo "=============================="
+      echo "$DOCKER_AUTH_CONFIG" | python3 -c "import json,sys; d=json.load(sys.stdin); a=list(d.get(\"auths\",{}).keys())[0]; print(f\"Registry: {a}\")" 2>&1 || true
+      REGISTRY_HOST=$(echo "$DOCKER_AUTH_CONFIG" | python3 -c "import json,sys; d=json.load(sys.stdin); print(list(d.get(\"auths\",{}).keys())[0])" 2>/dev/null)
+      REGISTRY_USER=$(echo "$DOCKER_AUTH_CONFIG" | python3 -c "import json,sys,base64; d=json.load(sys.stdin); auth=list(d[\"auths\"].values())[0][\"auth\"]; u,p=base64.b64decode(auth).decode().split(\":\"); print(u)" 2>/dev/null)
+      REGISTRY_PASS=$(echo "$DOCKER_AUTH_CONFIG" | python3 -c "import json,sys,base64; d=json.load(sys.stdin); auth=list(d[\"auths\"].values())[0][\"auth\"]; u,p=base64.b64decode(auth).decode().split(\":\"); print(p)" 2>/dev/null)
+      echo "$REGISTRY_PASS" | docker login "$REGISTRY_HOST" -u "$REGISTRY_USER" --password-stdin 2>&1
       # 诊断: 检查 dind service 网络和端口
       echo "=== 诊断: dind service 状态 ==="
       echo "Pod 内 /etc/hosts:"
