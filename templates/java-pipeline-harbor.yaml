@@ -122,7 +122,9 @@ test:
 # =============================================================================
 build:
   extends: .docker_build_harbor
-  image: $DOCKER_IMAGE
+  image:
+    name: $DOCKER_IMAGE
+    entrypoint: [""]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
 
