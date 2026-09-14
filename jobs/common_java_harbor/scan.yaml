@@ -1,16 +1,14 @@
 # ============================================
-# 单体 Java 项目 Trivy 镜像扫描模板 (Harbor 版本)
+# Java 项目 Trivy 镜像扫描模板 (Harbor 版本)
 # ============================================
-# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
+# 适用场景: Java 项目,使用 Harbor 镜像仓库
+# 无需 Docker daemon, 直接用 trivy 镜像扫描远程镜像
 
 .trivy_scan_harbor:
   stage: scan
-  image: docker:24.0.7-dind
-  services:
-    - docker:24.0.7-dind
+  image: aquasec/trivy:latest
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+    DOCKER_CONFIG: /tmp/docker-config
   retry:
     max: 2
     when:
@@ -22,6 +20,14 @@
       echo "Trivy 安全扫描 (Harbor 模式)"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
+      # 配置 Harbor 认证 (trivy 需要读取 config.json 来认证 Harbor)
+      mkdir -p "$DOCKER_CONFIG"
+      if [ -n "$DOCKER_AUTH_CONFIG" ]; then
+        echo "$DOCKER_AUTH_CONFIG" > "$DOCKER_CONFIG/config.json"
+        echo "Harbor 认证已配置"
+      else
+        echo "警告: 未配置 DOCKER_AUTH_CONFIG, 扫描可能失败"
+      fi
   script:
     - |
       # 镜像标签
@@ -33,8 +39,7 @@
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       echo "扫描镜像: $CI_REGISTRY_FULL_IMAGE"
       # 宽松模式: 仅报告不阻断
-      docker run --rm aquasec/trivy:latest \
-        image \
+      trivy image \
         --severity CRITICAL,HIGH \
         --no-progress \
         --exit-code 0 \

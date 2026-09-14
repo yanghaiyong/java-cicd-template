@@ -3,9 +3,9 @@
 # ============================================
 # 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库 + containerd
 # 与 java-pipeline.yaml 的区别:
-#   - 使用 Docker-in-Docker (dind) 构建镜像 (containerd 环境兼容)
+#   - 使用 BuildKit daemonless 构建镜像 (无需 Docker daemon)
 #   - 镜像仓库: Harbor (harbor-ui.test.com)
-#   - 凭据在 GitLab CI/CD Variables 中配置
+#   - 凭据通过 DOCKER_AUTH_CONFIG 环境变量注入
 #
 # 使用方式:
 #   .gitlab-ci.yml:
@@ -51,7 +51,7 @@ variables:
   # 镜像变量 (Harbor 版本)
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
-  DOCKER_IMAGE: "docker:24.0.7-dind"
+  DOCKER_IMAGE: "moby/buildkit:rootless"
   KUBECTL_IMAGE: "bitnami/kubectl:1.30"
 
   # ============================================
