@@ -1,8 +1,7 @@
 # ============================================
 # Java 项目 BuildKit 镜像构建模板 (Harbor 版本)
 # ============================================
-# 适用场景: Java 项目,使用 Harbor 镜像仓库 + BuildKit
-# 构建方式: moby/buildkit (rootful), 无需 Docker daemon
+# 构建方式: moby/buildkit (rootful via daocloud mirror)
 # TLS: Vault Root CA + Intermediate CA 通过 ConfigMap 挂载
 
 .docker_build_harbor:
@@ -48,7 +47,7 @@
       for d in "$DOCKER_CONFIG" "$HOME/.docker" "/root/.docker"; do
         mkdir -p "$d" && echo "$AUTH_JSON" > "$d/config.json"
       done
-      echo "Auth written to all config locations"
+      echo "Auth written to: $DOCKER_CONFIG, $HOME/.docker, /root/.docker"
       echo "BuildKit config done"
   script:
     - |
@@ -61,12 +60,9 @@
       echo "Dockerfile: $DOCKERFILE_PATH_CALC"
       echo "Build Context: $BUILD_CONTEXT"
       echo "========================================="
-      SOCKET="/tmp/buildkitd.sock"
-      buildkitd --addr "unix:$SOCKET" &
-      for i in $(seq 1 30); do [ -S "$SOCKET" ] && break; sleep 0.5; done
-      if [ ! -S "$SOCKET" ]; then echo "ERROR: buildkitd failed to start"; exit 1; fi
-      echo "buildkitd started"
-      buildctl --addr "unix:$SOCKET" build \
+      OCI_TAR="/tmp/image.tar"
+      echo "Phase 1: Building image to OCI tar..."
+      buildctl-daemonless.sh build \
         --frontend dockerfile.v0 \
         --local context="$BUILD_CONTEXT" \
         --local dockerfile="$DOCKERFILE_DIR" \
@@ -74,8 +70,74 @@
         --opt build-arg:BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
         --opt build-arg:VCS_REF=$CI_COMMIT_SHA \
         --opt build-arg:VERSION=$IMAGE_TAG \
-        --output type=image,name="$CI_REGISTRY_FULL_IMAGE",push=true \
+        --output type=oci,name="$CI_REGISTRY_FULL_IMAGE",dest="$OCI_TAR" \
         --export-cache type=inline \
         2>&1
-      echo "Build and push complete"
+      echo "Build complete. Image exported to $OCI_TAR ($(du -h $OCI_TAR | cut -f1))"
+      echo "========================================="
+      echo "Phase 2: Pushing image to Harbor via curl..."
+      REGISTRY="$CI_REGISTRY"
+      REPO=$(echo "$CI_REGISTRY_IMAGE")
+      TAG="$IMAGE_TAG"
+      TOKEN_USER="${CI_REGISTRY_USER}"
+      TOKEN_PASS="${CI_REGISTRY_PASSWORD}"
+      TOKEN_URL="https://$REGISTRY/service/token?service=harbor-registry&scope=repository:$REPO:pull,push"
+      TOKEN=$(wget -qO- --no-check-certificate "$TOKEN_URL" --header="Authorization: Basic $(printf '%s:%s' "$TOKEN_USER" "$TOKEN_PASS" | base64 -w0)" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
+      if [ -z "$TOKEN" ]; then
+        echo "ERROR: Failed to get push token"
+        exit 1
+      fi
+      echo "Got push token (${#TOKEN} chars)"
+      MANIFEST=$(python3 -c "
+import json, tarfile, io
+with tarfile.open('$OCI_TAR') as t:
+    idx = json.loads(t.extractfile('index.json').read())
+    mDigest = idx['manifests'][0]['digest']
+    manifest = json.loads(t.extractfile('blobs/' + mDigest).read())
+    print(json.dumps(manifest))
+")
+      MANIFEST_SIZE=$(echo "$MANIFEST" | wc -c)
+      MANIFEST_TYPE=$(echo "$MANIFEST" | python3 -c "import sys,json; print(json.load(sys.stdin).get('mediaType','application/vnd.oci.image.manifest.v1+json'))")
+      MANIFEST_DIGEST=$(echo "$MANIFEST" | sha256sum | awk '{print "sha256:"$1}')
+      echo "Manifest: type=$MANIFEST_TYPE size=${MANIFEST_SIZE}B digest=$MANIFEST_DIGEST"
+      python3 -c "
+import json, tarfile
+with tarfile.open('$OCI_TAR') as t:
+    idx = json.loads(t.extractfile('index.json').read())
+    mDigest = idx['manifests'][0]['digest']
+    manifest = json.loads(t.extractfile('blobs/' + mDigest).read())
+    blobs = [manifest['config']['digest']] + [l['digest'] for l in manifest.get('layers',[])]
+    for b in blobs:
+        print(b)
+" > /tmp/blobs.txt
+      BLOB_COUNT=$(wc -l < /tmp/blobs.txt)
+      echo "Blobs to push: $BLOB_COUNT"
+      i=0
+      while IFS= read -r BLOB_DIGEST; do
+        i=$((i+1))
+        BLOB_PATH="blobs/$BLOB_DIGEST"
+        echo "[$i/$BLOB_COUNT] Checking $BLOB_DIGEST..."
+        HTTP_CODE=$(wget -qS --spider --no-check-certificate -H "Authorization: Bearer $TOKEN" "https://$REGISTRY/v2/$REPO/blobs/$BLOB_DIGEST" 2>&1 | head -1)
+        if echo "$HTTP_CODE" | grep -q "200"; then
+          echo "  exists, skipping"
+        else
+          echo "  uploading..."
+          tar -xf "$OCI_TAR" -C /tmp "$BLOB_PATH" 2>/dev/null
+          UPLOAD_INIT=$(wget -qO- --no-check-certificate -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" "https://$REGISTRY/v2/$REPO/blobs/uploads/" 2>&1)
+          UPLOAD_URL=$(echo "$UPLOAD_INIT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('Location',''))" 2>/dev/null || echo "$UPLOAD_INIT")
+          echo "$UPLOAD_URL" | grep -q "http" || UPLOAD_URL="https://$REGISTRY/v2/$REPO/blobs/uploads/"
+          wget -q --no-check-certificate -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" --body-file "/tmp/$BLOB_PATH" "$UPLOAD_URL" 2>&1
+          rm -f "/tmp/$BLOB_PATH"
+          echo "  uploaded"
+        fi
+      done < /tmp/blobs.txt
+      echo "========================================="
+      echo "Pushing manifest..."
+      echo "$MANIFEST" | wget -q --no-check-certificate -X PUT \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: $MANIFEST_TYPE" \
+        --body-file=- \
+        "https://$REGISTRY/v2/$REPO/manifests/$TAG" 2>&1
+      echo "========================================="
+      echo "Image pushed: $CI_REGISTRY_FULL_IMAGE"
   needs: ["package"]
