@@ -39,21 +39,20 @@
       cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
          "$HOME/.config/buildkit/certs/harbor-ui.test.com/ca.crt"
       echo "Harbor CA 证书已注入: SSL_CERT_FILE=$SSL_CERT_FILE"
-      mkdir -p "$DOCKER_CONFIG"
       if [ -n "$CI_REGISTRY_USER" ] && [ -n "$CI_REGISTRY_PASSWORD" ]; then
         AUTH=$(printf '%s' "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" | base64 -w0)
-        printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > "$DOCKER_CONFIG/config.json"
-        echo "Harbor auth from CI_REGISTRY_USER/PASSWORD"
+        AUTH_JSON=$(printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH")
       elif [ -n "$DOCKER_AUTH_CONFIG" ]; then
-        echo "$DOCKER_AUTH_CONFIG" > "$DOCKER_CONFIG/config.json"
-        echo "Harbor auth from DOCKER_AUTH_CONFIG"
+        AUTH_JSON="$DOCKER_AUTH_CONFIG"
       else
         echo "ERROR: no auth configured"
         exit 1
       fi
-      echo "config.json contents:"
-      cat "$DOCKER_CONFIG/config.json" | python3 -c "import sys,json; d=json.load(sys.stdin); [print(f\"  registry={k} auth_len={len(v.get(\\\"auth\\\",\\\"\\\"))}\") for k,v in d.get(\\\"auths\\\",{}).items()]" 2>/dev/null || cat "$DOCKER_CONFIG/config.json"
-      echo "BuildKit 配置完成"
+      for d in "$DOCKER_CONFIG" "$HOME/.docker" "/home/user/.docker" "/root/.docker"; do
+        mkdir -p "$d" && echo "$AUTH_JSON" > "$d/config.json"
+      done
+      echo "Auth written to all config locations"
+      echo "BuildKit config done"
   script:
     - |
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
