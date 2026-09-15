@@ -51,7 +51,7 @@ variables:
   # 镜像变量 (Harbor 版本)
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
-  DOCKER_IMAGE: "moby/buildkit:rootless"
+  DOCKER_IMAGE: "harbor-ui.test.com/library/moby-buildkit:rootless"
   KUBECTL_IMAGE: "bitnami/kubectl:1.30"
 
   # ============================================

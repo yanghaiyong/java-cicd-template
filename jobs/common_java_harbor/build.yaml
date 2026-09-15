@@ -8,7 +8,7 @@
 
 .docker_build_harbor:
   stage: build
-  image: moby/buildkit:rootless
+  image: harbor-ui.test.com/library/buildkit:rootless
   variables:
     DOCKER_CONFIG: /tmp/docker-config
   retry:
