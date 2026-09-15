@@ -18,14 +18,11 @@
     - |
       echo "========================================="
       echo "BuildKit 镜像构建 (Harbor 模式)"
-      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
       if [ -n "$CI_COMMIT_TAG" ]; then
         IMAGE_TAG=$CI_COMMIT_TAG
-        echo "正式发布 - 使用 Tag: $IMAGE_TAG"
       else
         IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
-        echo "非生产环境 - 使用分支标签: $IMAGE_TAG"
       fi
       export IMAGE_TAG
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
@@ -34,7 +31,6 @@
       mkdir -p "$HOME/.config/buildkit/certs/harbor-ui.test.com"
       cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
          "$HOME/.config/buildkit/certs/harbor-ui.test.com/ca.crt"
-      echo "Harbor CA 证书已注入: SSL_CERT_FILE=$SSL_CERT_FILE"
       if [ -n "$CI_REGISTRY_USER" ] && [ -n "$CI_REGISTRY_PASSWORD" ]; then
         AUTH=$(printf '%s' "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" | base64 -w0)
         AUTH_JSON=$(printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH")
@@ -47,8 +43,7 @@
       for d in "$DOCKER_CONFIG" "$HOME/.docker" "/root/.docker"; do
         mkdir -p "$d" && echo "$AUTH_JSON" > "$d/config.json"
       done
-      echo "Auth written to: $DOCKER_CONFIG, $HOME/.docker, /root/.docker"
-      echo "BuildKit config done"
+      echo "Auth config ready"
   script:
     - |
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
@@ -58,10 +53,7 @@
       DOCKERFILE_DIR=$(dirname "$DOCKERFILE_PATH_CALC")
       DOCKERFILE_NAME=$(basename "$DOCKERFILE_PATH_CALC")
       echo "Dockerfile: $DOCKERFILE_PATH_CALC"
-      echo "Build Context: $BUILD_CONTEXT"
-      echo "========================================="
-      OCI_TAR="/tmp/image.tar"
-      echo "Phase 1: Building image to OCI tar..."
+      echo "Context: $BUILD_CONTEXT"
       buildctl-daemonless.sh build \
         --frontend dockerfile.v0 \
         --local context="$BUILD_CONTEXT" \
@@ -70,74 +62,8 @@
         --opt build-arg:BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
         --opt build-arg:VCS_REF=$CI_COMMIT_SHA \
         --opt build-arg:VERSION=$IMAGE_TAG \
-        --output type=oci,name="$CI_REGISTRY_FULL_IMAGE",dest="$OCI_TAR" \
+        --output type=image,name="$CI_REGISTRY_FULL_IMAGE",push=true \
         --export-cache type=inline \
         2>&1
-      echo "Build complete. Image exported to $OCI_TAR ($(du -h $OCI_TAR | cut -f1))"
-      echo "========================================="
-      echo "Phase 2: Pushing image to Harbor via curl..."
-      REGISTRY="$CI_REGISTRY"
-      REPO=$(echo "$CI_REGISTRY_IMAGE")
-      TAG="$IMAGE_TAG"
-      TOKEN_USER="${CI_REGISTRY_USER}"
-      TOKEN_PASS="${CI_REGISTRY_PASSWORD}"
-      TOKEN_URL="https://$REGISTRY/service/token?service=harbor-registry&scope=repository:$REPO:pull,push"
-      TOKEN=$(wget -qO- --no-check-certificate "$TOKEN_URL" --header="Authorization: Basic $(printf '%s:%s' "$TOKEN_USER" "$TOKEN_PASS" | base64 -w0)" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
-      if [ -z "$TOKEN" ]; then
-        echo "ERROR: Failed to get push token"
-        exit 1
-      fi
-      echo "Got push token (${#TOKEN} chars)"
-      MANIFEST=$(python3 -c "
-import json, tarfile, io
-with tarfile.open('$OCI_TAR') as t:
-    idx = json.loads(t.extractfile('index.json').read())
-    mDigest = idx['manifests'][0]['digest']
-    manifest = json.loads(t.extractfile('blobs/' + mDigest).read())
-    print(json.dumps(manifest))
-")
-      MANIFEST_SIZE=$(echo "$MANIFEST" | wc -c)
-      MANIFEST_TYPE=$(echo "$MANIFEST" | python3 -c "import sys,json; print(json.load(sys.stdin).get('mediaType','application/vnd.oci.image.manifest.v1+json'))")
-      MANIFEST_DIGEST=$(echo "$MANIFEST" | sha256sum | awk '{print "sha256:"$1}')
-      echo "Manifest: type=$MANIFEST_TYPE size=${MANIFEST_SIZE}B digest=$MANIFEST_DIGEST"
-      python3 -c "
-import json, tarfile
-with tarfile.open('$OCI_TAR') as t:
-    idx = json.loads(t.extractfile('index.json').read())
-    mDigest = idx['manifests'][0]['digest']
-    manifest = json.loads(t.extractfile('blobs/' + mDigest).read())
-    blobs = [manifest['config']['digest']] + [l['digest'] for l in manifest.get('layers',[])]
-    for b in blobs:
-        print(b)
-" > /tmp/blobs.txt
-      BLOB_COUNT=$(wc -l < /tmp/blobs.txt)
-      echo "Blobs to push: $BLOB_COUNT"
-      i=0
-      while IFS= read -r BLOB_DIGEST; do
-        i=$((i+1))
-        BLOB_PATH="blobs/$BLOB_DIGEST"
-        echo "[$i/$BLOB_COUNT] Checking $BLOB_DIGEST..."
-        HTTP_CODE=$(wget -qS --spider --no-check-certificate -H "Authorization: Bearer $TOKEN" "https://$REGISTRY/v2/$REPO/blobs/$BLOB_DIGEST" 2>&1 | head -1)
-        if echo "$HTTP_CODE" | grep -q "200"; then
-          echo "  exists, skipping"
-        else
-          echo "  uploading..."
-          tar -xf "$OCI_TAR" -C /tmp "$BLOB_PATH" 2>/dev/null
-          UPLOAD_INIT=$(wget -qO- --no-check-certificate -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" "https://$REGISTRY/v2/$REPO/blobs/uploads/" 2>&1)
-          UPLOAD_URL=$(echo "$UPLOAD_INIT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('Location',''))" 2>/dev/null || echo "$UPLOAD_INIT")
-          echo "$UPLOAD_URL" | grep -q "http" || UPLOAD_URL="https://$REGISTRY/v2/$REPO/blobs/uploads/"
-          wget -q --no-check-certificate -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" --body-file "/tmp/$BLOB_PATH" "$UPLOAD_URL" 2>&1
-          rm -f "/tmp/$BLOB_PATH"
-          echo "  uploaded"
-        fi
-      done < /tmp/blobs.txt
-      echo "========================================="
-      echo "Pushing manifest..."
-      echo "$MANIFEST" | wget -q --no-check-certificate -X PUT \
-        -H "Authorization: Bearer $TOKEN" \
-        -H "Content-Type: $MANIFEST_TYPE" \
-        --body-file=- \
-        "https://$REGISTRY/v2/$REPO/manifests/$TAG" 2>&1
-      echo "========================================="
-      echo "Image pushed: $CI_REGISTRY_FULL_IMAGE"
+      echo "Image built and pushed: $CI_REGISTRY_FULL_IMAGE"
   needs: ["package"]
