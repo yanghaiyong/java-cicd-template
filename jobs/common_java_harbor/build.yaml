@@ -24,7 +24,9 @@
       mkdir -p "$DOCKER_CONFIG"
       AUTH=$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 -w0)
       printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > "$DOCKER_CONFIG/config.json"
+      mkdir -p "$HOME/.docker"
       cp "$DOCKER_CONFIG/config.json" "$HOME/.docker/config.json"
+      mkdir -p /root/.docker
       cp "$DOCKER_CONFIG/config.json" "/root/.docker/config.json"
     - |
       cat > /tmp/push-v2.py << 'PYEOF'
