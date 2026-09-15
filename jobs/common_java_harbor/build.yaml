@@ -52,18 +52,6 @@
         mkdir -p "$d" && echo "$AUTH_JSON" > "$d/config.json"
       done
       echo "Auth written to all config locations"
-      if ! command -v crane >/dev/null 2>&1; then
-        echo "Downloading crane..."
-        wget -q -O /tmp/crane.tar.gz \
-          https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz && \
-        tar xzf /tmp/crane.tar.gz -C /usr/local/bin crane && \
-        chmod +x /usr/local/bin/crane && \
-        echo "crane $(crane version)" || echo "crane download failed, trying skopeo"
-      fi
-      if ! command -v crane >/dev/null 2>&1 && ! command -v skopeo >/dev/null 2>&1; then
-        echo "Installing skopeo..."
-        apk add --no-cache skopeo 2>/dev/null || echo "skopeo not available"
-      fi
       echo "BuildKit config done"
   script:
     - |
@@ -76,8 +64,21 @@
       echo "Dockerfile: $DOCKERFILE_PATH_CALC"
       echo "Build Context: $BUILD_CONTEXT"
       echo "========================================="
-      OCI_DIR="/tmp/oci-image"
-      buildctl-daemonless.sh build \
+      mkdir -p /run/buildkit
+      buildkitd --addr unix:///run/buildkit/buildkitd.sock \
+        --oci-worker-snapshotter=native &
+      BUILDKITD_PID=$!
+      for i in $(seq 1 30); do
+        [ -S /run/buildkit/buildkitd.sock ] && break
+        sleep 0.5
+      done
+      if [ ! -S /run/buildkit/buildkitd.sock ]; then
+        echo "ERROR: buildkitd failed to start"
+        kill $BUILDKITD_PID 2>/dev/null
+        exit 1
+      fi
+      echo "buildkitd started (pid=$BUILDKITD_PID)"
+      buildctl --addr unix:///run/buildkit/buildkitd.sock build \
         --frontend dockerfile.v0 \
         --local context="$BUILD_CONTEXT" \
         --local dockerfile="$DOCKERFILE_DIR" \
@@ -85,16 +86,39 @@
         --opt build-arg:BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
         --opt build-arg:VCS_REF=$CI_COMMIT_SHA \
         --opt build-arg:VERSION=$IMAGE_TAG \
-        --output type=oci,"name=$CI_REGISTRY_FULL_IMAGE",dest="$OCI_DIR/image.tar" \
+        --output type=image,name="$CI_REGISTRY_FULL_IMAGE",push=true \
         --export-cache type=inline \
         2>&1
-      echo "BuildKit build done, image exported to $OCI_DIR/image.tar"
-      echo "Pushing with crane..."
-      crane push \
-        --insecure \
-        --tls-verify=false \
-        "$OCI_DIR/image.tar" \
-        "$CI_REGISTRY_FULL_IMAGE" \
-        2>&1
-      echo "Image pushed: $CI_REGISTRY_FULL_IMAGE"
+      BUILD_EXIT=$?
+      kill $BUILDKITD_PID 2>/dev/null
+      if [ $BUILD_EXIT -ne 0 ]; then
+        echo "Build/push failed (exit=$BUILD_EXIT), retrying with OCI export..."
+        OCI_TAR="/tmp/image.tar"
+        buildkitd --addr unix:///run/buildkit/buildkitd.sock \
+          --oci-worker-snapshotter=native &
+        BUILDKITD_PID=$!
+        for i in $(seq 1 30); do
+          [ -S /run/buildkit/buildkitd.sock ] && break
+          sleep 0.5
+        done
+        buildctl --addr unix:///run/buildkit/buildkitd.sock build \
+          --frontend dockerfile.v0 \
+          --local context="$BUILD_CONTEXT" \
+          --local dockerfile="$DOCKERFILE_DIR" \
+          --opt filename="$DOCKERFILE_NAME" \
+          --opt build-arg:BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+          --opt build-arg:VCS_REF=$CI_COMMIT_SHA \
+          --opt build-arg:VERSION=$IMAGE_TAG \
+          --output type=oci,"name=$CI_REGISTRY_FULL_IMAGE",dest="$OCI_TAR" \
+          --export-cache type=inline \
+          2>&1
+        kill $BUILDKITD_PID 2>/dev/null
+        echo "Image exported to $OCI_TAR, pushing via skopeo..."
+        skopeo copy --dest-tls-verify=false \
+          "oci:$OCI_TAR:$CI_REGISTRY_FULL_IMAGE" \
+          "docker://$CI_REGISTRY_FULL_IMAGE" \
+          --dest-creds "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" \
+          2>&1
+      fi
+      echo "Build/push complete"
   needs: ["package"]
