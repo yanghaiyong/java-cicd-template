@@ -38,14 +38,25 @@
       cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
          "$HOME/.config/buildkit/certs/harbor-ui.test.com/ca.crt"
       echo "Harbor CA 证书已注入到 $HOME/.config/buildkit/certs/"
-      # 配置 Harbor 认证
+      # 配置 Harbor 认证 (支持 DOCKER_AUTH_CONFIG 或 CI_REGISTRY_USER/PASSWORD)
       mkdir -p "$DOCKER_CONFIG"
       if [ -n "$DOCKER_AUTH_CONFIG" ]; then
         echo "$DOCKER_AUTH_CONFIG" > "$DOCKER_CONFIG/config.json"
-        echo "Harbor 认证已配置"
+        echo "Harbor 认证已配置 (DOCKER_AUTH_CONFIG)"
+      elif [ -n "$CI_REGISTRY_USER" ] && [ -n "$CI_REGISTRY_PASSWORD" ]; then
+        AUTH=$(printf '%s' "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" | base64 -w0)
+        cat > "$DOCKER_CONFIG/config.json" << DOCKEREOF
+{
+  "auths": {
+    "$CI_REGISTRY": {
+      "auth": "$AUTH"
+    }
+  }
+}
+DOCKEREOF
+        echo "Harbor 认证已配置 (CI_REGISTRY_USER/PASSWORD)"
       else
-        echo "错误: 未配置 DOCKER_AUTH_CONFIG"
-        echo "请在 GitLab 项目 Settings -> CI/CD -> Variables 添加 DOCKER_AUTH_CONFIG"
+        echo "错误: 未配置 DOCKER_AUTH_CONFIG 或 CI_REGISTRY_USER/PASSWORD"
         exit 1
       fi
       echo "BuildKit 配置完成"
