@@ -52,11 +52,22 @@
         mkdir -p "$d" && echo "$AUTH_JSON" > "$d/config.json"
       done
       echo "Auth written to all config locations"
+      if ! command -v crane >/dev/null 2>&1; then
+        echo "Downloading crane..."
+        wget -q -O /tmp/crane.tar.gz \
+          https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz && \
+        tar xzf /tmp/crane.tar.gz -C /usr/local/bin crane && \
+        chmod +x /usr/local/bin/crane && \
+        echo "crane $(crane version)" || echo "crane download failed, trying skopeo"
+      fi
+      if ! command -v crane >/dev/null 2>&1 && ! command -v skopeo >/dev/null 2>&1; then
+        echo "Installing skopeo..."
+        apk add --no-cache skopeo 2>/dev/null || echo "skopeo not available"
+      fi
       echo "BuildKit config done"
   script:
     - |
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
-      # 确定 Dockerfile 路径
       BUILD_CONTEXT="${APP_MAVEN_PATH:-.}"
       DOCKERFILE_PATH_CALC="$BUILD_CONTEXT/src/main/docker/Dockerfile"
       [ -f "$DOCKERFILE_PATH_CALC" ] || DOCKERFILE_PATH_CALC="Dockerfile"
@@ -65,7 +76,7 @@
       echo "Dockerfile: $DOCKERFILE_PATH_CALC"
       echo "Build Context: $BUILD_CONTEXT"
       echo "========================================="
-      # BuildKit 构建并推送
+      OCI_DIR="/tmp/oci-image"
       buildctl-daemonless.sh build \
         --frontend dockerfile.v0 \
         --local context="$BUILD_CONTEXT" \
@@ -74,8 +85,16 @@
         --opt build-arg:BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
         --opt build-arg:VCS_REF=$CI_COMMIT_SHA \
         --opt build-arg:VERSION=$IMAGE_TAG \
-        --output type=image,name="$CI_REGISTRY_FULL_IMAGE",push=true \
+        --output type=oci,"name=$CI_REGISTRY_FULL_IMAGE",dest="$OCI_DIR/image.tar" \
         --export-cache type=inline \
         2>&1
-      echo "镜像构建并推送成功: $CI_REGISTRY_FULL_IMAGE"
+      echo "BuildKit build done, image exported to $OCI_DIR/image.tar"
+      echo "Pushing with crane..."
+      crane push \
+        --insecure \
+        --tls-verify=false \
+        "$OCI_DIR/image.tar" \
+        "$CI_REGISTRY_FULL_IMAGE" \
+        2>&1
+      echo "Image pushed: $CI_REGISTRY_FULL_IMAGE"
   needs: ["package"]
