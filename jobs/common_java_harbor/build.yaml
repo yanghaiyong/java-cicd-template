@@ -61,7 +61,12 @@
       echo "Dockerfile: $DOCKERFILE_PATH_CALC"
       echo "Build Context: $BUILD_CONTEXT"
       echo "========================================="
-      buildctl-daemonless.sh build \
+      SOCKET="/tmp/buildkitd.sock"
+      buildkitd --addr "unix:$SOCKET" &
+      for i in $(seq 1 30); do [ -S "$SOCKET" ] && break; sleep 0.5; done
+      if [ ! -S "$SOCKET" ]; then echo "ERROR: buildkitd failed to start"; exit 1; fi
+      echo "buildkitd started"
+      buildctl --addr "unix:$SOCKET" build \
         --frontend dockerfile.v0 \
         --local context="$BUILD_CONTEXT" \
         --local dockerfile="$DOCKERFILE_DIR" \
@@ -72,5 +77,5 @@
         --output type=image,name="$CI_REGISTRY_FULL_IMAGE",push=true \
         --export-cache type=inline \
         2>&1
-      echo "Image built and pushed: $CI_REGISTRY_FULL_IMAGE"
+      echo "Build and push complete"
   needs: ["package"]
