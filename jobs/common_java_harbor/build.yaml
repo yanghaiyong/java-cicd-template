@@ -33,17 +33,12 @@
       export IMAGE_TAG
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
-      # 注入 Harbor TLS 证书 (Vault Root CA + Intermediate CA)
+      export SSL_CERT_FILE=/etc/docker/certs.d/harbor-ui.test.com/ca.crt
+      export SSL_CERT_DIR=/etc/ssl/certs
       mkdir -p "$HOME/.config/buildkit/certs/harbor-ui.test.com"
       cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
          "$HOME/.config/buildkit/certs/harbor-ui.test.com/ca.crt"
-      # 同时加入系统 CA 存储,解决 buildctl Go TLS 校验
-      cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
-         /usr/local/share/ca-certificates/harbor-ui-test-com.crt 2>/dev/null && \
-         update-ca-certificates 2>/dev/null || \
-         cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
-         /etc/ssl/certs/ca-certificates.crt 2>/dev/null || true
-      echo "Harbor CA 证书已注入到 BuildKit + 系统 CA 存储"
+      echo "Harbor CA 证书已注入: SSL_CERT_FILE=$SSL_CERT_FILE"
       # 配置 Harbor 认证 (支持 DOCKER_AUTH_CONFIG 或 CI_REGISTRY_USER/PASSWORD)
       mkdir -p "$DOCKER_CONFIG"
       if [ -n "$DOCKER_AUTH_CONFIG" ]; then
