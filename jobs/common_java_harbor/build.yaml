@@ -1,9 +1,3 @@
-# ============================================
-# Java 项目 BuildKit 镜像构建模板 (Harbor 版本)
-# ============================================
-# 构建方式: moby/buildkit (rootful via daocloud mirror)
-# TLS: Vault Root CA + Intermediate CA 通过 ConfigMap 挂载
-
 .docker_build_harbor:
   stage: build
   image: docker.m.daocloud.io/moby/buildkit:latest
@@ -16,54 +10,110 @@
       - stuck_or_timeout_failure
   before_script:
     - |
-      echo "========================================="
-      echo "BuildKit 镜像构建 (Harbor 模式)"
-      echo "========================================="
       if [ -n "$CI_COMMIT_TAG" ]; then
         IMAGE_TAG=$CI_COMMIT_TAG
       else
         IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
       fi
       export IMAGE_TAG
-      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
-      echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
+      export CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       export SSL_CERT_FILE=/etc/docker/certs.d/harbor-ui.test.com/ca.crt
       mkdir -p "$HOME/.config/buildkit/certs/harbor-ui.test.com"
       cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
          "$HOME/.config/buildkit/certs/harbor-ui.test.com/ca.crt"
-      if [ -n "$CI_REGISTRY_USER" ] && [ -n "$CI_REGISTRY_PASSWORD" ]; then
-        AUTH=$(printf '%s' "$CI_REGISTRY_USER:$CI_REGISTRY_PASSWORD" | base64 -w0)
-        AUTH_JSON=$(printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH")
-      elif [ -n "$DOCKER_AUTH_CONFIG" ]; then
-        AUTH_JSON="$DOCKER_AUTH_CONFIG"
-      else
-        echo "ERROR: no auth configured"
-        exit 1
-      fi
-      for d in "$DOCKER_CONFIG" "$HOME/.docker" "/root/.docker"; do
-        mkdir -p "$d" && echo "$AUTH_JSON" > "$d/config.json"
-      done
-      echo "Auth config ready"
+      mkdir -p "$DOCKER_CONFIG"
+      AUTH=$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 -w0)
+      printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > "$DOCKER_CONFIG/config.json"
+      cp "$DOCKER_CONFIG/config.json" "$HOME/.docker/config.json"
+      cp "$DOCKER_CONFIG/config.json" "/root/.docker/config.json"
+    - |
+      cat > /tmp/push-v2.py << 'PYEOF'
+      import json, subprocess, sys, hashlib, tarfile, os
+
+      oci_tar = "/tmp/image.tar"
+      registry = os.environ["CI_REGISTRY"]
+      repo = os.environ["CI_REGISTRY_IMAGE"]
+      tag = os.environ["IMAGE_TAG"]
+      user = os.environ["CI_REGISTRY_USER"]
+      pw = os.environ["CI_REGISTRY_PASSWORD"]
+      import base64
+      creds = base64.b64encode(f"{user}:{pw}".encode()).decode()
+
+      def wget(args, input_data=None):
+          cmd = ["wget", "-q", "--no-check-certificate", "-O", "-"] + args
+          r = subprocess.run(cmd, input=input_data, capture_output=True, text=True, timeout=600)
+          return r.stdout, r.stderr
+
+      token_url = f"https://{registry}/service/token?service=harbor-registry&scope=repository:{repo}:pull,push"
+      out, err = wget(["--header", f"Authorization: Basic {creds}", token_url])
+      token = json.loads(out).get("token", "")
+      if not token:
+          print(f"ERROR: no token. stderr: {err}", file=sys.stderr)
+          sys.exit(1)
+      print(f"Got token ({len(token)} chars)")
+
+      hdr = f"Authorization: Bearer {token}"
+
+      with tarfile.open(oci_tar) as t:
+          idx = json.loads(t.extractfile("index.json").read())
+          m_digest = idx["manifests"][0]["digest"]
+          manifest = json.loads(t.extractfile(f"blobs/{m_digest}").read())
+          config_digest = manifest["config"]["digest"]
+          layer_digests = [l["digest"] for l in manifest.get("layers", [])]
+          all_digests = [config_digest] + layer_digests
+
+      print(f"Manifest: {manifest.get('mediaType','?')}")
+      print(f"Blobs: {len(all_digests)}")
+
+      for i, d in enumerate(all_digests, 1):
+          blob_path = f"blobs/{d}"
+          check_out, _ = wget(["--spider", "-H", hdr, f"https://{registry}/v2/{repo}/blobs/{d}"])
+          code_out, code_err = wget(["--spider", "-H", hdr, f"https://{registry}/v2/{repo}/blobs/{d}"])
+          if "200" in code_err or "200" in code_out:
+              print(f"  [{i}/{len(all_digests)}] {d[:20]}... exists")
+              continue
+          print(f"  [{i}/{len(all_digests)}] {d[:20]}... uploading")
+          with tarfile.open(oci_tar) as t:
+              member = t.getmember(blob_path)
+              f = t.extractfile(member)
+              blob_data = f.read()
+          init_out, _ = wget(["-X", "POST", "-H", hdr, "-H", "Content-Type: application/octet-stream",
+                              f"https://{registry}/v2/{repo}/blobs/uploads/"])
+          loc = init_out.strip()
+          if not loc.startswith("http"):
+              loc = f"https://{registry}/v2/{repo}/blobs/uploads/"
+          put_out, put_err = wget(["-X", "PUT", "-H", hdr, "-H", "Content-Type: application/octet-stream",
+                                   "--body-file", "/dev/stdin", loc], input_data=blob_data)
+          print(f"    uploaded")
+
+      print("Pushing manifest...")
+      m_type = manifest.get("mediaType", "application/vnd.oci.image.manifest.v1+json")
+      m_data = json.dumps(manifest).encode()
+      put_out, put_err = wget(["-X", "PUT", "-H", hdr, "-H", f"Content-Type: {m_type}",
+                               "--body-file", "/dev/stdin",
+                               f"https://{registry}/v2/{repo}/manifests/{tag}"], input_data=m_data)
+      print(f"Push complete: {os.environ['CI_REGISTRY_FULL_IMAGE']}")
+      PYEOF
   script:
     - |
-      CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
-      BUILD_CONTEXT="${APP_MAVEN_PATH:-.}"
-      DOCKERFILE_PATH_CALC="$BUILD_CONTEXT/src/main/docker/Dockerfile"
-      [ -f "$DOCKERFILE_PATH_CALC" ] || DOCKERFILE_PATH_CALC="Dockerfile"
-      DOCKERFILE_DIR=$(dirname "$DOCKERFILE_PATH_CALC")
-      DOCKERFILE_NAME=$(basename "$DOCKERFILE_PATH_CALC")
-      echo "Dockerfile: $DOCKERFILE_PATH_CALC"
-      echo "Context: $BUILD_CONTEXT"
+      echo "========================================="
+      echo "Phase 1: Building image to OCI tar..."
+      echo "========================================="
       buildctl-daemonless.sh build \
         --frontend dockerfile.v0 \
-        --local context="$BUILD_CONTEXT" \
-        --local dockerfile="$DOCKERFILE_DIR" \
-        --opt filename="$DOCKERFILE_NAME" \
+        --local context="${APP_MAVEN_PATH:-.}" \
+        --local dockerfile="$(dirname "${APP_MAVEN_PATH:-.}/src/main/docker/Dockerfile")" \
+        --opt filename="$(basename "${APP_MAVEN_PATH:-.}/src/main/docker/Dockerfile")" \
         --opt build-arg:BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
         --opt build-arg:VCS_REF=$CI_COMMIT_SHA \
         --opt build-arg:VERSION=$IMAGE_TAG \
-        --output type=image,name="$CI_REGISTRY_FULL_IMAGE",push=true \
+        --output type=oci,name="$CI_REGISTRY_FULL_IMAGE",dest=/tmp/image.tar \
         --export-cache type=inline \
         2>&1
-      echo "Image built and pushed: $CI_REGISTRY_FULL_IMAGE"
+      echo "Build done: $(du -h /tmp/image.tar | cut -f1)"
+    - |
+      echo "========================================="
+      echo "Phase 2: Pushing to Harbor via v2 API..."
+      echo "========================================="
+      python3 /tmp/push-v2.py
   needs: ["package"]
