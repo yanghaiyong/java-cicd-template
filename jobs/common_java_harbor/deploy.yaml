@@ -9,7 +9,7 @@
 .k8s_deploy_harbor:
   stage: deploy
   image:
-    name: harbor-ui.test.com/library/buildkit:kubectl-1.30
+    name: docker.io/bitnamilegacy/kubectl:1.30.3
     entrypoint: [""]
   variables:
     DOCKER_HOST: tcp://docker:2375

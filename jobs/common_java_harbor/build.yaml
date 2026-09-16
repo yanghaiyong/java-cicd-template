@@ -1,8 +1,15 @@
 .docker_build_harbor:
   stage: build
-  image: harbor-ui.test.com/library/buildkit:rootless
+  image: docker:24
+  services:
+    - name: docker:24-dind
+      alias: docker
+      command: ["dockerd-entrypoint.sh"]
+      variables:
+        DOCKER_TLS_CERTDIR: ""
   variables:
-    DOCKER_CONFIG: /tmp/docker-config
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   retry:
     max: 2
     when:
@@ -17,162 +24,38 @@
       fi
       export IMAGE_TAG
       export CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
-      export SSL_CERT_FILE=/etc/docker/certs.d/harbor-ui.test.com/ca.crt
-      mkdir -p "$HOME/.config/buildkit/certs/harbor-ui.test.com"
-      cp /etc/docker/certs.d/harbor-ui.test.com/ca.crt \
-         "$HOME/.config/buildkit/certs/harbor-ui.test.com/ca.crt"
-      mkdir -p "$DOCKER_CONFIG"
-      AUTH=$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 -w0)
-      printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > "$DOCKER_CONFIG/config.json"
-      mkdir -p "$HOME/.docker"
-      cp "$DOCKER_CONFIG/config.json" "$HOME/.docker/config.json"
+      # CA cert already mounted at /etc/docker/certs.d/harbor-ui.test.com via ConfigMap
+      # Wait for docker daemon to be ready
+      for i in 1 2 3 4 5 6 7 8 9 10; do
+        if docker info >/dev/null 2>&1; then
+          echo "Docker daemon ready (attempt $i)"
+          break
+        fi
+        echo "Waiting for Docker daemon (attempt $i)..."
+        sleep 2
+      done
+      # Login to Harbor
+      echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
   script:
     - |
       echo "========================================="
-      echo "Phase 1: Building image to OCI tar..."
+      echo "Building image: $CI_REGISTRY_FULL_IMAGE"
       echo "========================================="
-      buildctl-daemonless.sh build \
-        --frontend dockerfile.v0 \
-        --local context="${APP_MAVEN_PATH:-.}" \
-        --local dockerfile="$(dirname "${APP_MAVEN_PATH:-.}/src/main/docker/Dockerfile")" \
-        --opt filename="$(basename "${APP_MAVEN_PATH:-.}/src/main/docker/Dockerfile")" \
-        --opt build-arg:BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-        --opt build-arg:VCS_REF=$CI_COMMIT_SHA \
-        --opt build-arg:VERSION=$IMAGE_TAG \
-        --output type=oci,name="$CI_REGISTRY_FULL_IMAGE",dest=/tmp/image.tar \
-        --export-cache type=inline \
-        2>&1
-      echo "Build done: $(du -h /tmp/image.tar | cut -f1)"
+      docker build \
+        --pull \
+        --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+        --build-arg VCS_REF="$CI_COMMIT_SHA" \
+        --build-arg VERSION="$IMAGE_TAG" \
+        -t "$CI_REGISTRY_FULL_IMAGE" \
+        -f "${APP_MAVEN_PATH:-.}/src/main/docker/Dockerfile" \
+        "${APP_MAVEN_PATH:-.}"
     - |
       echo "========================================="
-      echo "Phase 2: Pushing to Harbor via v2 API..."
+      echo "Pushing image to Harbor..."
       echo "========================================="
-      REGISTRY="$CI_REGISTRY"
-      REPO="$CI_REGISTRY_IMAGE"
-      TAG="$IMAGE_TAG"
-      USER="$CI_REGISTRY_USER"
-      PASS="$CI_REGISTRY_PASSWORD"
-      CREDS=$(printf '%s:%s' "$USER" "$PASS" | base64 -w0)
-
-      TOKEN_RESP=$(wget -qO- --header="Authorization: Basic $CREDS" \
-        "https://${REGISTRY}/service/token?service=harbor-registry&scope=repository:${REPO}:pull,push" 2>/dev/null) || true
-      TOKEN=$(echo "$TOKEN_RESP" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-      if [ -z "$TOKEN" ]; then
-        echo "ERROR: failed to obtain token. Response: $TOKEN_RESP" >&2
-        exit 1
-      fi
-      echo "Got token (${#TOKEN} chars)"
-      BEARER="Authorization: Bearer $TOKEN"
-
-      echo "Step: cd /tmp"
-      cd /tmp || { echo "ERROR: cd /tmp failed"; exit 1; }
-      echo "Step: extract tar"
-      rm -rf oci-extract
-      mkdir -p oci-extract && cd oci-extract
-      tar -xf /tmp/image.tar 2>&1 || { echo "ERROR: tar extraction failed"; exit 1; }
-      echo "Step: extract manifest digest"
-
-      M_DIGEST=$(cat index.json | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -1)
-      M_HEX="${M_DIGEST#sha256:}"
-      if [ -f "blobs/sha256/${M_HEX}" ]; then
-        cp "blobs/sha256/${M_HEX}" manifest.json
-      else
-        echo "ERROR: manifest blob not found at blobs/sha256/${M_HEX}"
-        exit 1
-      fi
-
-      # Extract digest fields directly with grep -o (handles pretty-printed JSON naturally)
-      CONFIG_DIGEST=$(grep -o '"digest": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(sha256:[^"]*\)"/\1/')
-      ALL_DIGESTS=$(grep -o '"digest": "[^"]*"' manifest.json | sed 's/.*"\(sha256:[^"]*\)"/\1/')
-      LAYER_HEXES=$(echo "$ALL_DIGESTS" | grep -v "^${CONFIG_DIGEST}$" | sed 's/^sha256://')
-      echo "Manifest digest: $M_DIGEST"
-      echo "Config digest: $CONFIG_DIGEST"
-      echo "Layers: $(echo "$LAYER_HEXES" | grep -c .)"
-
-      # Upload each blob using two-step Harbor API: POST initiate + PUT finalize
-      upload_blob() {
-        local digest="$1"
-        local hex="${digest#sha256:}"
-        # Check if blob exists via HEAD (wget --spider returns 0 if exists)
-        if wget --spider -q --no-check-certificate \
-          --header="$BEARER" \
-          "https://${REGISTRY}/v2/${REPO}/blobs/${digest}" 2>/dev/null; then
-          echo "  [skip] $digest"
-          return 0
-        fi
-        # Step 1: POST to initiate upload, capture Location header from stderr (-S)
-        INIT_OUT=$(wget --no-check-certificate \
-          --header="$BEARER" \
-          --post-data="" \
-          -S \
-          "https://${REGISTRY}/v2/${REPO}/blobs/uploads/" -O /dev/null 2>&1) || true
-        LOC=$(echo "$INIT_OUT" | grep -i "^  location:" | head -1 | sed 's/.*location: *//' | tr -d '\r')
-        if [ -z "$LOC" ]; then
-          echo "  [FAIL initiate] $digest (no Location header)"
-          return 1
-        fi
-        # Make LOC absolute if relative
-        case "$LOC" in
-          http*) FULL_URL="$LOC" ;;
-          /*)    FULL_URL="https://${REGISTRY}${LOC}" ;;
-          *)     FULL_URL="https://${REGISTRY}/${LOC}" ;;
-        esac
-        # Append digest query
-        case "$FULL_URL" in
-          *\?*) FULL_URL="${FULL_URL}&digest=${digest}" ;;
-          *)    FULL_URL="${FULL_URL}?digest=${digest}" ;;
-        esac
-        # Step 2: PUT blob via openssl (BusyBox wget has no PUT)
-        HOST_PORT=$(echo "$FULL_URL" | sed -n 's|https://\([^/]*\).*|\1|p')
-        REQ_PATH=$(echo "$FULL_URL" | sed -n 's|https://[^/]*\(.*\)|\1|p')
-        BODY_SIZE=$(wc -c < "blobs/sha256/${hex}")
-        HDR_FILE=$(mktemp); OUT_FILE=$(mktemp)
-        printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
-          "$REQ_PATH" "$HOST_PORT" "$TOKEN" "$BODY_SIZE" > "$HDR_FILE"
-        echo -n "  [upload] $digest ... "
-        cat "$HDR_FILE" "blobs/sha256/${hex}" | openssl s_client -connect "${HOST_PORT}:443" -quiet > "$OUT_FILE" 2>&1 || true
-        if grep -qE "HTTP/1\.[01] 20[0-9]" "$OUT_FILE"; then
-          echo "OK"
-        else
-          echo "FAIL"
-          grep -v "verify\|depth=\|CONNECTED\|Certificate\|^\-\-\-|subject:\|issuer:\|start date" "$OUT_FILE" | head -5
-          rm -f "$HDR_FILE" "$OUT_FILE"
-          return 1
-        fi
-        rm -f "$HDR_FILE" "$OUT_FILE"
-      }
-
-      upload_blob "$CONFIG_DIGEST"
-      for d in $LAYER_HEXES; do
-        upload_blob "sha256:${d}"
-      done
-
-      echo "Pushing manifest..."
-      MTYPE=$(grep -o '"mediaType": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(application[^"]*\)".*/\1/')
-      MTYPE=${MTYPE:-application/vnd.oci.image.manifest.v1+json}
-      if ! command -v openssl >/dev/null 2>&1; then
-        echo "ERROR: openssl not found, cannot do PUT"
-        exit 1
-      fi
-      HOST_PORT="${REGISTRY}"
-      MANIFEST_PATH="/v2/${REPO}/manifests/${TAG}"
-      BODY_SIZE=$(wc -c < manifest.json)
-      HDR_FILE=$(mktemp); PUSH_OUT_FILE=$(mktemp); REQ_FILE=$(mktemp)
-      printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
-        "$MANIFEST_PATH" "$HOST_PORT" "$TOKEN" "$MTYPE" "$BODY_SIZE" > "$HDR_FILE"
-      cat "$HDR_FILE" manifest.json > "$REQ_FILE"
-      # Run openssl in subshell with SIGPIPE ignored (exit code 141 = 128+13)
-      (trap '' PIPE; openssl s_client -connect "${HOST_PORT}:443" -quiet -ign_eof < "$REQ_FILE" > "$PUSH_OUT_FILE" 2>&1)
-      PUSH_RC=$?
-      rm -f "$HDR_FILE" "$REQ_FILE"
-      if grep -qE "HTTP/1\.[01] 20[0-9]" "$PUSH_OUT_FILE"; then
-        echo "Manifest pushed via PUT (rc=$PUSH_RC)"
-      else
-        echo "PUT response (excluding TLS handshake):"
-        grep -v "verify\|depth=\|CONNECTED\|Certificate\|^\-\-\-" "$PUSH_OUT_FILE" | head -10
-        rm -f "$PUSH_OUT_FILE"
-        exit 1
-      fi
-      rm -f "$PUSH_OUT_FILE"
-      echo "Push complete: ${CI_REGISTRY_FULL_IMAGE}"
+      docker push "$CI_REGISTRY_FULL_IMAGE"
+    - |
+      echo "========================================="
+      echo "Build complete: $CI_REGISTRY_FULL_IMAGE"
+      docker images "$CI_REGISTRY_FULL_IMAGE"
   needs: ["package"]
