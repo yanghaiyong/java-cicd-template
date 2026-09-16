@@ -125,27 +125,29 @@
       echo "$LAYER_HEXES"
       echo "Layers: $(echo "$LAYER_HEXES" | grep -c .)"
 
-      # Upload each blob
+      # Upload each blob (using wget since buildkit:rootless has no curl)
       upload_blob() {
         local digest="$1"  # full digest like sha256:<hex>
         local hex="${digest#sha256:}"
-        # Check if blob exists (HEAD)
-        HEAD_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
-          -H "$BEARER" \
-          "https://${REGISTRY}/v2/${REPO}/blobs/${digest}" 2>/dev/null || echo "000")
-        if [ "$HEAD_CODE" = "200" ]; then
+        # Check if blob exists via HEAD (wget --spider does HEAD)
+        HTTP_CODE=$(wget --spider -S --no-check-certificate \
+          --header="$BEARER" \
+          "https://${REGISTRY}/v2/${REPO}/blobs/${digest}" 2>&1 \
+          | sed -n 's/.*HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | head -1)
+        if [ "$HTTP_CODE" = "200" ]; then
           echo "  [skip] $digest exists"
           return 0
         fi
         # Monolithic upload via POST with ?digest query (single-request)
-        LOC="https://${REGISTRY}/v2/${REPO}/blobs/uploads/?digest=${digest}"
+        URL="https://${REGISTRY}/v2/${REPO}/blobs/uploads/?digest=${digest}"
         echo "  [upload] $digest"
-        curl -sk -X POST \
-          -H "$BEARER" \
-          -H "Content-Type: application/octet-stream" \
-          --data-binary "@blobs/sha256/${hex}" \
-          "$LOC"
-        echo ""
+        wget -q --no-check-certificate \
+          --method=POST \
+          --header="$BEARER" \
+          --header="Content-Type: application/octet-stream" \
+          --body-file="blobs/sha256/${hex}" \
+          "$URL" \
+          && echo "    OK" || echo "    FAILED"
       }
         echo "  [upload] $digest -> $LOC"
         curl -sk -X PUT \
