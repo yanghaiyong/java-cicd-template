@@ -54,20 +54,23 @@
       PASS="$CI_REGISTRY_PASSWORD"
       CREDS=$(printf '%s:%s' "$USER" "$PASS" | base64 -w0)
 
-      TOKEN=$(wget -qO- --header="Authorization: Basic $CREDS" \
-        "https://${REGISTRY}/service/token?service=harbor-registry&scope=repository:${REPO}:pull,push" \
-        | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+      TOKEN_RESP=$(wget -qO- --header="Authorization: Basic $CREDS" \
+        "https://${REGISTRY}/service/token?service=harbor-registry&scope=repository:${REPO}:pull,push" 2>/dev/null) || true
+      TOKEN=$(echo "$TOKEN_RESP" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
       if [ -z "$TOKEN" ]; then
-        echo "ERROR: failed to obtain token" >&2
+        echo "ERROR: failed to obtain token. Response: $TOKEN_RESP" >&2
         exit 1
       fi
       echo "Got token (${#TOKEN} chars)"
       BEARER="Authorization: Bearer $TOKEN"
 
+      echo "Step: cd /tmp"
       cd /tmp || { echo "ERROR: cd /tmp failed"; exit 1; }
+      echo "Step: extract tar"
       rm -rf oci-extract
       mkdir -p oci-extract && cd oci-extract
       tar -xf /tmp/image.tar 2>&1 || { echo "ERROR: tar extraction failed"; exit 1; }
+      echo "Step: extract manifest digest"
 
       M_DIGEST=$(cat index.json | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -1)
       M_HEX="${M_DIGEST#sha256:}"
