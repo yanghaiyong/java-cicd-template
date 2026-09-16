@@ -179,7 +179,7 @@
         upload_blob "sha256:${d}"
       done
 
-echo "Pushing manifest..."
+      echo "Pushing manifest..."
       MTYPE=$(grep -o '"mediaType": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(application[^"]*\)".*/\1/')
       MTYPE=${MTYPE:-application/vnd.oci.image.manifest.v1+json}
       # Ignore SIGPIPE to survive openssl pipe closure
