@@ -89,7 +89,7 @@
       echo "Config digest: $CONFIG_DIGEST"
       echo "Layers: $(echo "$LAYER_HEXES" | grep -c .)"
 
-      # Upload each blob using wget (buildkit:rootless has no curl)
+      # Upload each blob using two-step Harbor API: POST initiate + PUT finalize
       upload_blob() {
         local digest="$1"
         local hex="${digest#sha256:}"
@@ -100,22 +100,46 @@
           echo "  [skip] $digest"
           return 0
         fi
-        URL="https://${REGISTRY}/v2/${REPO}/blobs/uploads/?digest=${digest}"
-        echo -n "  [upload] $digest ... "
-        # BusyBox wget has no --method/--body-file; --post-file implicitly uses POST
-        UPLOAD_OUT=$(wget --no-check-certificate \
+        # Step 1: POST to initiate upload, capture Location header from stderr (-S)
+        INIT_OUT=$(wget --no-check-certificate \
           --header="$BEARER" \
-          --header="Content-Type: application/octet-stream" \
-          --post-file="blobs/sha256/${hex}" \
-          "$URL" 2>&1) || UPLOAD_RC=$?
-        UPLOAD_RC=${UPLOAD_RC:-0}
-        if [ "$UPLOAD_RC" = "0" ]; then
-          echo "OK"
-        else
-          echo "FAILED (rc=$UPLOAD_RC)"
-          echo "  output: $UPLOAD_OUT" | head -3
+          --post-data="" \
+          -S \
+          "https://${REGISTRY}/v2/${REPO}/blobs/uploads/" -O /dev/null 2>&1) || true
+        LOC=$(echo "$INIT_OUT" | grep -i "^  location:" | head -1 | sed 's/.*location: *//' | tr -d '\r')
+        if [ -z "$LOC" ]; then
+          echo "  [FAIL initiate] $digest (no Location header)"
           return 1
         fi
+        # Make LOC absolute if relative
+        case "$LOC" in
+          http*) FULL_URL="$LOC" ;;
+          /*)    FULL_URL="https://${REGISTRY}${LOC}" ;;
+          *)     FULL_URL="https://${REGISTRY}/${LOC}" ;;
+        esac
+        # Append digest query
+        case "$FULL_URL" in
+          *\?*) FULL_URL="${FULL_URL}&digest=${digest}" ;;
+          *)    FULL_URL="${FULL_URL}?digest=${digest}" ;;
+        esac
+        # Step 2: PUT blob via openssl (BusyBox wget has no PUT)
+        HOST_PORT=$(echo "$FULL_URL" | sed -n 's|https://\([^/]*\).*|\1|p')
+        REQ_PATH=$(echo "$FULL_URL" | sed -n 's|https://[^/]*\(.*\)|\1|p')
+        BODY_SIZE=$(wc -c < "blobs/sha256/${hex}")
+        HDR_FILE=$(mktemp); OUT_FILE=$(mktemp)
+        printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
+          "$REQ_PATH" "$HOST_PORT" "$TOKEN" "$BODY_SIZE" > "$HDR_FILE"
+        echo -n "  [upload] $digest ... "
+        cat "$HDR_FILE" "blobs/sha256/${hex}" | openssl s_client -connect "${HOST_PORT}:443" -quiet > "$OUT_FILE" 2>&1 || true
+        if grep -qE "HTTP/1\.[01] 20[0-9]" "$OUT_FILE"; then
+          echo "OK"
+        else
+          echo "FAIL"
+          grep -v "verify\|depth=\|CONNECTED\|Certificate\|^\-\-\-|subject:\|issuer:\|start date" "$OUT_FILE" | head -5
+          rm -f "$HDR_FILE" "$OUT_FILE"
+          return 1
+        fi
+        rm -f "$HDR_FILE" "$OUT_FILE"
       }
 
       upload_blob "$CONFIG_DIGEST"
