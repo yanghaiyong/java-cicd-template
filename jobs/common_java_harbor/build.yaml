@@ -8,6 +8,10 @@
     when:
       - runner_system_failure
       - stuck_or_timeout_failure
+  artifacts:
+    paths:
+      - kubectl-bin/kubectl
+    expire_in: 1 hour
   before_script:
     - |
       if [ -n "$CI_COMMIT_TAG" ]; then
@@ -43,6 +47,13 @@
         --export-cache type=inline \
         2>&1
       echo "Build done: $(du -h /tmp/image.tar | cut -f1)"
+    - |
+      # Download kubectl binary to pass as artifact (cluster runners can reach dl.k8s.io)
+      echo "Downloading kubectl for deploy stage..."
+      mkdir -p kubectl-bin
+      wget -q "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl" -O kubectl-bin/kubectl
+      chmod +x kubectl-bin/kubectl
+      ls -la kubectl-bin/kubectl
     - |
       echo "========================================="
       echo "Phase 2: Pushing to Harbor via v2 API..."

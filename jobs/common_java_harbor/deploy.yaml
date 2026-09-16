@@ -43,29 +43,15 @@
       echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
-      # Download kubectl with fallback URLs (cluster may block some CDNs)
-      KUBECTL_VERSION="${KUBECTL_VERSION:-v1.30.0}"
-      echo "Downloading kubectl ${KUBECTL_VERSION}..."
-      KUBECTL_OK=0
-      for URL in \
-        "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
-        "https://github.com/kubernetes/kubernetes/releases/download/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
-        "https://mirror.gcr.io/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
-        "https://harbor-ui.test.com/library/kubectl-download/${KUBECTL_VERSION}/kubectl"; do
-        echo "  Trying: $URL"
-        if wget -q --timeout=20 -O /usr/local/bin/kubectl "$URL" 2>&1; then
-          if [ -s /usr/local/bin/kubectl ] && head -c 4 /usr/local/bin/kubectl | grep -q ELF; then
-            echo "  OK from $URL"
-            KUBECTL_OK=1
-            break
-          fi
-        fi
-      done
-      if [ "$KUBECTL_OK" = "0" ]; then
-        echo "ERROR: failed to download kubectl from any source"
+      # Use kubectl binary passed from build stage as artifact (avoids CDN blocks)
+      if [ -f "kubectl-bin/kubectl" ]; then
+        cp kubectl-bin/kubectl /usr/local/bin/kubectl
+        chmod +x /usr/local/bin/kubectl
+        echo "Using kubectl from build artifact"
+      else
+        echo "ERROR: kubectl-bin/kubectl not found in artifacts"
         exit 1
       fi
-      chmod +x /usr/local/bin/kubectl
       kubectl version --client
       # Kubeconfig 认证
       if [ -n "$KUBECONFIG_CONTEXT" ]; then
