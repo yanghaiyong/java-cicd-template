@@ -126,15 +126,22 @@
       echo "Pushing manifest via openssl (BusyBox wget has no PUT)..."
       MTYPE=$(grep -o '"mediaType": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(application[^"]*\)".*/\1/')
       MTYPE=${MTYPE:-application/vnd.oci.image.manifest.v1+json}
-      MANIFEST_URL="https://${REGISTRY}/v2/${REPO}/manifests/${TAG}"
       HOST_PORT="${REGISTRY}"
       MANIFEST_PATH="/v2/${REPO}/manifests/${TAG}"
       BODY_SIZE=$(wc -c < manifest.json)
-      # Construct HTTP PUT request and send via openssl s_client
-      HTTP_REQ="PUT ${MANIFEST_PATH} HTTP/1.1\r\nHost: ${HOST_PORT}\r\nAuthorization: Bearer ${TOKEN}\r\nContent-Type: ${MTYPE}\r\nContent-Length: ${BODY_SIZE}\r\nConnection: close\r\n\r\n"
-      PUSH_OUT=$(printf "%b" "$HTTP_REQ" | cat - manifest.json | openssl s_client -connect "${HOST_PORT}:443" -quiet 2>&1) || PUSH_RC=$?
+      # Check openssl availability
+      if ! command -v openssl >/dev/null 2>&1; then
+        echo "ERROR: openssl not found in image, cannot do PUT"
+        exit 1
+      fi
+      # Write HTTP headers to temp file, then concatenate body to avoid pipe SIGPIPE
+      HDR_FILE=$(mktemp)
+      printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
+        "$MANIFEST_PATH" "$HOST_PORT" "$TOKEN" "$MTYPE" "$BODY_SIZE" > "$HDR_FILE"
+      PUSH_OUT=$(cat "$HDR_FILE" manifest.json | openssl s_client -connect "${HOST_PORT}:443" -quiet 2>&1) || PUSH_RC=$?
       PUSH_RC=${PUSH_RC:-0}
-      if echo "$PUSH_OUT" | grep -q "201\|HTTP/1.1 2"; then
+      rm -f "$HDR_FILE"
+      if echo "$PUSH_OUT" | grep -qE "HTTP/1\.[01] 20[0-9]"; then
         echo "Manifest pushed OK"
       else
         echo "Manifest FAILED (rc=$PUSH_RC)"
