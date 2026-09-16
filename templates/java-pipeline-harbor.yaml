@@ -51,7 +51,7 @@ variables:
   # 镜像变量 (Harbor 版本)
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
-  DOCKER_IMAGE: "harbor-ui.test.com/library/buildkit:rootless"
+  DOCKER_IMAGE: "docker:24"
   KUBECTL_IMAGE: "docker.io/bitnamilegacy/kubectl:1.30.3"
 
   # ============================================
@@ -122,9 +122,6 @@ test:
 # =============================================================================
 build:
   extends: .docker_build_harbor
-  image:
-    name: $DOCKER_IMAGE
-    entrypoint: [""]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
 
