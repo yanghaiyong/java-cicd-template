@@ -26,76 +26,6 @@
       printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > "$DOCKER_CONFIG/config.json"
       mkdir -p "$HOME/.docker"
       cp "$DOCKER_CONFIG/config.json" "$HOME/.docker/config.json"
-      mkdir -p /root/.docker
-      cp "$DOCKER_CONFIG/config.json" "/root/.docker/config.json"
-    - |
-      cat > /tmp/push-v2.py << 'PYEOF'
-      import json, subprocess, sys, hashlib, tarfile, os
-
-      oci_tar = "/tmp/image.tar"
-      registry = os.environ["CI_REGISTRY"]
-      repo = os.environ["CI_REGISTRY_IMAGE"]
-      tag = os.environ["IMAGE_TAG"]
-      user = os.environ["CI_REGISTRY_USER"]
-      pw = os.environ["CI_REGISTRY_PASSWORD"]
-      import base64
-      creds = base64.b64encode(f"{user}:{pw}".encode()).decode()
-
-      def wget(args, input_data=None):
-          cmd = ["wget", "-q", "--no-check-certificate", "-O", "-"] + args
-          r = subprocess.run(cmd, input=input_data, capture_output=True, text=True, timeout=600)
-          return r.stdout, r.stderr
-
-      token_url = f"https://{registry}/service/token?service=harbor-registry&scope=repository:{repo}:pull,push"
-      out, err = wget(["--header", f"Authorization: Basic {creds}", token_url])
-      token = json.loads(out).get("token", "")
-      if not token:
-          print(f"ERROR: no token. stderr: {err}", file=sys.stderr)
-          sys.exit(1)
-      print(f"Got token ({len(token)} chars)")
-
-      hdr = f"Authorization: Bearer {token}"
-
-      with tarfile.open(oci_tar) as t:
-          idx = json.loads(t.extractfile("index.json").read())
-          m_digest = idx["manifests"][0]["digest"]
-          manifest = json.loads(t.extractfile(f"blobs/{m_digest}").read())
-          config_digest = manifest["config"]["digest"]
-          layer_digests = [l["digest"] for l in manifest.get("layers", [])]
-          all_digests = [config_digest] + layer_digests
-
-      print(f"Manifest: {manifest.get('mediaType','?')}")
-      print(f"Blobs: {len(all_digests)}")
-
-      for i, d in enumerate(all_digests, 1):
-          blob_path = f"blobs/{d}"
-          check_out, _ = wget(["--spider", "-H", hdr, f"https://{registry}/v2/{repo}/blobs/{d}"])
-          code_out, code_err = wget(["--spider", "-H", hdr, f"https://{registry}/v2/{repo}/blobs/{d}"])
-          if "200" in code_err or "200" in code_out:
-              print(f"  [{i}/{len(all_digests)}] {d[:20]}... exists")
-              continue
-          print(f"  [{i}/{len(all_digests)}] {d[:20]}... uploading")
-          with tarfile.open(oci_tar) as t:
-              member = t.getmember(blob_path)
-              f = t.extractfile(member)
-              blob_data = f.read()
-          init_out, _ = wget(["-X", "POST", "-H", hdr, "-H", "Content-Type: application/octet-stream",
-                              f"https://{registry}/v2/{repo}/blobs/uploads/"])
-          loc = init_out.strip()
-          if not loc.startswith("http"):
-              loc = f"https://{registry}/v2/{repo}/blobs/uploads/"
-          put_out, put_err = wget(["-X", "PUT", "-H", hdr, "-H", "Content-Type: application/octet-stream",
-                                   "--body-file", "/dev/stdin", loc], input_data=blob_data)
-          print(f"    uploaded")
-
-      print("Pushing manifest...")
-      m_type = manifest.get("mediaType", "application/vnd.oci.image.manifest.v1+json")
-      m_data = json.dumps(manifest).encode()
-      put_out, put_err = wget(["-X", "PUT", "-H", hdr, "-H", f"Content-Type: {m_type}",
-                               "--body-file", "/dev/stdin",
-                               f"https://{registry}/v2/{repo}/manifests/{tag}"], input_data=m_data)
-      print(f"Push complete: {os.environ['CI_REGISTRY_FULL_IMAGE']}")
-      PYEOF
   script:
     - |
       echo "========================================="
@@ -117,5 +47,104 @@
       echo "========================================="
       echo "Phase 2: Pushing to Harbor via v2 API..."
       echo "========================================="
-      python3 /tmp/push-v2.py
+      # Use curl if available, else wget
+      command -v curl >/dev/null 2>&1 && HTTP_CMD="curl" || HTTP_CMD="wget"
+      echo "Using: $HTTP_CMD"
+
+      set -e
+
+      REGISTRY="$CI_REGISTRY"
+      REPO="$CI_REGISTRY_IMAGE"
+      TAG="$IMAGE_TAG"
+      USER="$CI_REGISTRY_USER"
+      PASS="$CI_REGISTRY_PASSWORD"
+      CREDS=$(printf '%s:%s' "$USER" "$PASS" | base64 -w0)
+
+      # Get bearer token from Harbor token endpoint
+      TOKEN=$(wget -qO- --header="Authorization: Basic $CREDS" \
+        "https://${REGISTRY}/service/token?service=harbor-registry&scope=repository:${REPO}:pull,push" \
+        | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+      if [ -z "$TOKEN" ]; then
+        echo "ERROR: failed to obtain token" >&2
+        exit 1
+      fi
+      echo "Got token (${#TOKEN} chars)"
+      BEARER="Authorization: Bearer $TOKEN"
+
+      # Extract manifest, config digest, and layer digests from OCI tar
+      cd /tmp
+      mkdir -p oci-extract && cd oci-extract
+      tar -xf /tmp/image.tar
+      M_DIGEST=$(cat index.json | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -1)
+      mkdir -p blobs-raw
+      cp -r blobs/. blobs-raw/ 2>/dev/null || cp -r blobs/* blobs-raw/
+      cat blobs/${M_DIGEST} > manifest.json
+      CONFIG_DIGEST=$(sed -n 's/.*"config":{"digest":"\([^"]*\)".*/\1/p' manifest.json)
+      LAYER_DIGESTS=$(sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' manifest.json | grep -v "^${CONFIG_DIGEST}$")
+      echo "Manifest digest: $M_DIGEST"
+      echo "Config digest: $CONFIG_DIGEST"
+      echo "Layers: $(echo "$LAYER_DIGESTS" | wc -l)"
+
+      # Upload each blob
+      upload_blob() {
+        local digest="$1"
+        local file="$2"
+        # Check if blob exists (HEAD)
+        HEAD_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
+          -H "$BEARER" \
+          "https://${REGISTRY}/v2/${REPO}/blobs/${digest}" 2>/dev/null || echo "000")
+        if [ "$HEAD_CODE" = "200" ]; then
+          echo "  [skip] $digest exists"
+          return 0
+        fi
+        # Initiate upload, follow Location header
+        LOC=$(curl -sk -D - -o /dev/null \
+          -X POST \
+          -H "$BEARER" \
+          -H "Content-Type: application/octet-stream" \
+          -H "Content-Length: 0" \
+          "https://${REGISTRY}/v2/${REPO}/blobs/uploads/" 2>&1 \
+          | sed -n 's/^[Ll]ocation: *//p' | tr -d '\r\n')
+        # If no Location header from POST, try POST with ?digest query
+        if [ -z "$LOC" ]; then
+          LOC="https://${REGISTRY}/v2/${REPO}/blobs/uploads/?digest=${digest}"
+        elif echo "$LOC" | grep -qv "^https"; then
+          LOC="https://${REGISTRY}${LOC}"
+        fi
+        # Append digest query if not present (monolithic upload)
+        if ! echo "$LOC" | grep -q "digest="; then
+          if echo "$LOC" | grep -q "?"; then
+            LOC="${LOC}&digest=${digest}"
+          else
+            LOC="${LOC}?digest=${digest}"
+          fi
+        fi
+        echo "  [upload] $digest -> $LOC"
+        curl -sk -X PUT \
+          -H "$BEARER" \
+          -H "Content-Type: application/octet-stream" \
+          --data-binary "@${file}" \
+          "$LOC"
+        echo ""
+      }
+
+      # Upload config
+      upload_blob "$CONFIG_DIGEST" "blobs-raw/${CONFIG_DIGEST}"
+
+      # Upload layers
+      for d in $LAYER_DIGESTS; do
+        upload_blob "$d" "blobs-raw/${d}"
+      done
+
+      # Push manifest
+      echo "Pushing manifest..."
+      MTYPE=$(sed -n 's/.*"mediaType":"\([^"]*\)".*/\1/p' manifest.json | head -1)
+      MTYPE=${MTYPE:-application/vnd.oci.image.manifest.v1+json}
+      curl -sk -X PUT \
+        -H "$BEARER" \
+        -H "Content-Type: ${MTYPE}" \
+        --data-binary "@manifest.json" \
+        "https://${REGISTRY}/v2/${REPO}/manifests/${TAG}"
+      echo ""
+      echo "Push complete: ${CI_REGISTRY_FULL_IMAGE}"
   needs: ["package"]
