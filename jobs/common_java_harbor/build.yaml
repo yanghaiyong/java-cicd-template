@@ -51,9 +51,12 @@
       # Download kubectl binary to pass as artifact (cluster runners can reach dl.k8s.io)
       echo "Downloading kubectl for deploy stage..."
       mkdir -p kubectl-bin
-      wget -q "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl" -O kubectl-bin/kubectl
+      # Unset SSL_CERT_FILE (set to Harbor CA) and skip cert verification for dl.k8s.io
+      unset SSL_CERT_FILE SSL_CERT_DIR
+      wget --no-check-certificate -q "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl" -O kubectl-bin/kubectl
       chmod +x kubectl-bin/kubectl
       ls -la kubectl-bin/kubectl
+      file kubectl-bin/kubectl 2>&1 || head -c 4 kubectl-bin/kubectl | od -c | head -1
     - |
       echo "========================================="
       echo "Phase 2: Pushing to Harbor via v2 API..."
