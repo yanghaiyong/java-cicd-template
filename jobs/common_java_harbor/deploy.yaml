@@ -9,7 +9,7 @@
 .k8s_deploy_harbor:
   stage: deploy
   image:
-    name: bitnami/kubectl:latest
+    name: harbor-ui.test.com/library/alpine:3.19
     entrypoint: [""]
   variables:
     DOCKER_HOST: tcp://docker:2375
@@ -43,6 +43,12 @@
       echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
+      # Download kubectl (alpine base has no kubectl; pull from Google CDN)
+      KUBECTL_VERSION="${KUBECTL_VERSION:-v1.30.0}"
+      echo "Downloading kubectl ${KUBECTL_VERSION}..."
+      wget -q "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -O /usr/local/bin/kubectl
+      chmod +x /usr/local/bin/kubectl
+      kubectl version --client
       # Kubeconfig 认证
       if [ -n "$KUBECONFIG_CONTEXT" ]; then
         echo "使用 KUBECONFIG_CONTEXT: $KUBECONFIG_CONTEXT"
