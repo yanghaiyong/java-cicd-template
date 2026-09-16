@@ -112,9 +112,11 @@
       echo "manifest.json:"
       cat manifest.json
       echo ""
-      CONFIG_DIGEST=$(sed -n 's/.*"config":{"digest":"\([^"]*\)".*/\1/p' manifest.json)
+      # JSON is pretty-printed; collapse to single line for sed
+      MANIFEST_ONELINE=$(tr -d '\n' < manifest.json)
+      CONFIG_DIGEST=$(echo "$MANIFEST_ONELINE" | sed -n 's/.*"config":{"digest":"\([^"]*\)".*/\1/p')
       # Collect layer digests; strip sha256: prefix for filesystem paths
-      LAYER_DIGESTS=$(sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' manifest.json \
+      LAYER_DIGESTS=$(echo "$MANIFEST_ONELINE" | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' \
         | grep -v "^${CONFIG_DIGEST}$" | grep -v "^${M_DIGEST}$" \
         | sed 's/^sha256://')
       echo "Manifest digest: $M_DIGEST"
