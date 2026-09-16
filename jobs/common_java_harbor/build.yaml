@@ -138,14 +138,15 @@
       HDR_FILE=$(mktemp)
       printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
         "$MANIFEST_PATH" "$HOST_PORT" "$TOKEN" "$MTYPE" "$BODY_SIZE" > "$HDR_FILE"
-      PUSH_OUT=$(cat "$HDR_FILE" manifest.json | openssl s_client -connect "${HOST_PORT}:443" -quiet 2>&1) || PUSH_RC=$?
+      PUSH_OUT=$(cat "$HDR_FILE" manifest.json | openssl s_client -connect "${HOST_PORT}:443" 2>&1) || PUSH_RC=$?
       PUSH_RC=${PUSH_RC:-0}
       rm -f "$HDR_FILE"
+      echo "openssl response (first 10 lines):"
+      echo "$PUSH_OUT" | grep -v "verify\|depth=" | head -10
       if echo "$PUSH_OUT" | grep -qE "HTTP/1\.[01] 20[0-9]"; then
         echo "Manifest pushed OK"
       else
         echo "Manifest FAILED (rc=$PUSH_RC)"
-        echo "$PUSH_OUT" | head -5
         exit 1
       fi
       echo "Push complete: ${CI_REGISTRY_FULL_IMAGE}"
