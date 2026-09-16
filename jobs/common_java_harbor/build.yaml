@@ -47,10 +47,6 @@
       echo "========================================="
       echo "Phase 2: Pushing to Harbor via v2 API..."
       echo "========================================="
-      # Use curl if available, else wget
-      command -v curl >/dev/null 2>&1 && HTTP_CMD="curl" || HTTP_CMD="wget"
-      echo "Using: $HTTP_CMD"
-
       REGISTRY="$CI_REGISTRY"
       REPO="$CI_REGISTRY_IMAGE"
       TAG="$IMAGE_TAG"
@@ -58,7 +54,6 @@
       PASS="$CI_REGISTRY_PASSWORD"
       CREDS=$(printf '%s:%s' "$USER" "$PASS" | base64 -w0)
 
-      # Get bearer token from Harbor token endpoint
       TOKEN=$(wget -qO- --header="Authorization: Basic $CREDS" \
         "https://${REGISTRY}/service/token?service=harbor-registry&scope=repository:${REPO}:pull,push" \
         | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
@@ -69,112 +64,73 @@
       echo "Got token (${#TOKEN} chars)"
       BEARER="Authorization: Bearer $TOKEN"
 
-      # Extract manifest, config digest, and layer digests from OCI tar
       cd /tmp || { echo "ERROR: cd /tmp failed"; exit 1; }
       rm -rf oci-extract
       mkdir -p oci-extract && cd oci-extract
       tar -xf /tmp/image.tar 2>&1 || { echo "ERROR: tar extraction failed"; exit 1; }
-      echo "Extracted files:"
-      ls -la
-      echo "blobs dir:"
-      ls blobs/
-      echo "blobs/sha256 dir (with sizes):"
-      ls -la blobs/sha256/
-      echo "All files in extracted dir:"
-      find . -type f
-      echo "index.json:"
-      cat index.json
-      echo ""
-      echo "Content of blobs/sha256/* (first 200 chars each):"
-      for f in blobs/sha256/*; do
-        echo "=== $f ($(wc -c < "$f") bytes) ==="
-        head -c 200 "$f"
-        echo ""
-      done
+
       M_DIGEST=$(cat index.json | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -1)
-      echo "M_DIGEST: $M_DIGEST"
-      # Strip algorithm prefix to get hex-only path (blobs/sha256/<hex>, not blobs/sha256/sha256:<hex>)
       M_HEX="${M_DIGEST#sha256:}"
-      echo "M_HEX: $M_HEX"
-      echo "Looking for manifest blob..."
       if [ -f "blobs/sha256/${M_HEX}" ]; then
         cp "blobs/sha256/${M_HEX}" manifest.json
-        echo "Found at blobs/sha256/${M_HEX}"
-      elif [ -f "blobs/sha256/${M_DIGEST}" ]; then
-        cp "blobs/sha256/${M_DIGEST}" manifest.json
-        echo "Found at blobs/sha256/${M_DIGEST}"
       else
-        echo "ERROR: manifest blob not found at blobs/sha256/${M_HEX} or blobs/sha256/${M_DIGEST}"
-        echo "Available blobs:"
-        ls -la blobs/sha256/
+        echo "ERROR: manifest blob not found at blobs/sha256/${M_HEX}"
         exit 1
       fi
-      echo "manifest.json:"
-      cat manifest.json
-      echo ""
+
       # Extract digest fields directly with grep -o (handles pretty-printed JSON naturally)
       CONFIG_DIGEST=$(grep -o '"digest": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(sha256:[^"]*\)"/\1/')
       ALL_DIGESTS=$(grep -o '"digest": "[^"]*"' manifest.json | sed 's/.*"\(sha256:[^"]*\)"/\1/')
-      # Layer digests = all digests except config (manifest digest is from index.json, not here)
       LAYER_HEXES=$(echo "$ALL_DIGESTS" | grep -v "^${CONFIG_DIGEST}$" | sed 's/^sha256://')
       echo "Manifest digest: $M_DIGEST"
-      echo "Config digest: $CONFIG_DIGEST (hex: ${CONFIG_DIGEST#sha256:})"
-      echo "All digests in manifest:"
-      echo "$ALL_DIGESTS"
-      echo "Layer hexes:"
-      echo "$LAYER_HEXES"
+      echo "Config digest: $CONFIG_DIGEST"
       echo "Layers: $(echo "$LAYER_HEXES" | grep -c .)"
 
-      # Upload each blob (using wget since buildkit:rootless has no curl)
+      # Upload each blob using wget (buildkit:rootless has no curl)
       upload_blob() {
-        local digest="$1"  # full digest like sha256:<hex>
+        local digest="$1"
         local hex="${digest#sha256:}"
-        # Check if blob exists via HEAD (wget --spider does HEAD)
         HTTP_CODE=$(wget --spider -S --no-check-certificate \
           --header="$BEARER" \
           "https://${REGISTRY}/v2/${REPO}/blobs/${digest}" 2>&1 \
           | sed -n 's/.*HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | head -1)
         if [ "$HTTP_CODE" = "200" ]; then
-          echo "  [skip] $digest exists"
+          echo "  [skip] $digest"
           return 0
         fi
-        # Monolithic upload via POST with ?digest query (single-request)
         URL="https://${REGISTRY}/v2/${REPO}/blobs/uploads/?digest=${digest}"
-        echo "  [upload] $digest"
-        wget -q --no-check-certificate \
+        echo -n "  [upload] $digest ... "
+        if wget -q --no-check-certificate \
           --method=POST \
           --header="$BEARER" \
           --header="Content-Type: application/octet-stream" \
           --body-file="blobs/sha256/${hex}" \
-          "$URL" \
-          && echo "    OK" || echo "    FAILED"
-      }
-        echo "  [upload] $digest -> $LOC"
-        curl -sk -X PUT \
-          -H "$BEARER" \
-          -H "Content-Type: application/octet-stream" \
-          --data-binary "@${file}" \
-          "$LOC"
-        echo ""
+          "$URL"; then
+          echo "OK"
+        else
+          echo "FAILED"
+          return 1
+        fi
       }
 
-      # Upload config
-      upload_blob "$CONFIG_DIGEST" "blobs-raw/${CONFIG_DIGEST}"
-
-      # Upload layers
-      for d in $LAYER_DIGESTS; do
-        upload_blob "$d" "blobs-raw/${d}"
+      upload_blob "$CONFIG_DIGEST"
+      for d in $LAYER_HEXES; do
+        upload_blob "sha256:${d}"
       done
 
-      # Push manifest
       echo "Pushing manifest..."
-      MTYPE=$(sed -n 's/.*"mediaType":"\([^"]*\)".*/\1/p' manifest.json | head -1)
+      MTYPE=$(grep -o '"mediaType": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(application[^"]*\)".*/\1/')
       MTYPE=${MTYPE:-application/vnd.oci.image.manifest.v1+json}
-      curl -sk -X PUT \
-        -H "$BEARER" \
-        -H "Content-Type: ${MTYPE}" \
-        --data-binary "@manifest.json" \
-        "https://${REGISTRY}/v2/${REPO}/manifests/${TAG}"
-      echo ""
+      if wget -q --no-check-certificate \
+        --method=PUT \
+        --header="$BEARER" \
+        --header="Content-Type: ${MTYPE}" \
+        --body-file=manifest.json \
+        "https://${REGISTRY}/v2/${REPO}/manifests/${TAG}"; then
+        echo "Manifest pushed"
+      else
+        echo "Manifest FAILED"
+        exit 1
+      fi
       echo "Push complete: ${CI_REGISTRY_FULL_IMAGE}"
   needs: ["package"]
