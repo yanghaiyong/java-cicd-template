@@ -59,7 +59,7 @@
         export KUBECONFIG=""
         kubectl config use-context $KUBECONFIG_CONTEXT
       elif [ -n "$KUBECONFIG_CONTENT" ]; then
-        echo "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
+        printf '%s' "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
         chmod 600 /tmp/kubeconfig
         export KUBECONFIG=/tmp/kubeconfig
       else
