@@ -51,8 +51,6 @@
       command -v curl >/dev/null 2>&1 && HTTP_CMD="curl" || HTTP_CMD="wget"
       echo "Using: $HTTP_CMD"
 
-      set -e
-
       REGISTRY="$CI_REGISTRY"
       REPO="$CI_REGISTRY_IMAGE"
       TAG="$IMAGE_TAG"
@@ -72,14 +70,35 @@
       BEARER="Authorization: Bearer $TOKEN"
 
       # Extract manifest, config digest, and layer digests from OCI tar
-      cd /tmp
+      cd /tmp || { echo "ERROR: cd /tmp failed"; exit 1; }
       rm -rf oci-extract
       mkdir -p oci-extract && cd oci-extract
-      tar -xf /tmp/image.tar
+      tar -xf /tmp/image.tar 2>&1 || { echo "ERROR: tar extraction failed"; exit 1; }
+      echo "Extracted files:"
+      ls -la
+      echo "blobs dir:"
+      ls blobs/
+      echo "blobs/sha256 dir:"
+      ls blobs/sha256/ | head -10
+      echo "index.json:"
+      cat index.json
+      echo ""
       M_DIGEST=$(cat index.json | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -1)
+      echo "M_DIGEST: $M_DIGEST"
       # Strip algorithm prefix to get hex-only path (blobs/sha256/<hex>, not blobs/sha256/sha256:<hex>)
       M_HEX="${M_DIGEST#sha256:}"
-      cp "blobs/sha256/${M_HEX}" manifest.json
+      echo "M_HEX: $M_HEX"
+      if [ -f "blobs/sha256/${M_HEX}" ]; then
+        cp "blobs/sha256/${M_HEX}" manifest.json
+      elif [ -f "blobs/sha256/${M_DIGEST}" ]; then
+        cp "blobs/sha256/${M_DIGEST}" manifest.json
+      else
+        echo "ERROR: manifest blob not found at blobs/sha256/${M_HEX} or blobs/sha256/${M_DIGEST}"
+        exit 1
+      fi
+      echo "manifest.json:"
+      cat manifest.json
+      echo ""
       CONFIG_DIGEST=$(sed -n 's/.*"config":{"digest":"\([^"]*\)".*/\1/p' manifest.json)
       # Collect layer digests; strip sha256: prefix for filesystem paths
       LAYER_DIGESTS=$(sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' manifest.json \
