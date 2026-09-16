@@ -93,11 +93,10 @@
       upload_blob() {
         local digest="$1"
         local hex="${digest#sha256:}"
-        HTTP_CODE=$(wget --spider -S --no-check-certificate \
+        # Check if blob exists via HEAD (wget --spider returns 0 if exists)
+        if wget --spider -q --no-check-certificate \
           --header="$BEARER" \
-          "https://${REGISTRY}/v2/${REPO}/blobs/${digest}" 2>&1 \
-          | sed -n 's/.*HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | head -1)
-        if [ "$HTTP_CODE" = "200" ]; then
+          "https://${REGISTRY}/v2/${REPO}/blobs/${digest}" 2>/dev/null; then
           echo "  [skip] $digest"
           return 0
         fi
@@ -108,7 +107,7 @@
           --header="$BEARER" \
           --header="Content-Type: application/octet-stream" \
           --body-file="blobs/sha256/${hex}" \
-          "$URL"; then
+          "$URL" 2>/dev/null; then
           echo "OK"
         else
           echo "FAILED"
