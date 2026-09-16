@@ -158,12 +158,11 @@
       MANIFEST_PATH="/v2/${REPO}/manifests/${TAG}"
       BODY_SIZE=$(wc -c < manifest.json)
       HDR_FILE=$(mktemp); PUSH_OUT_FILE=$(mktemp); REQ_FILE=$(mktemp)
-      # Combine headers + body into one file to avoid pipe SIGPIPE issues
       printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
         "$MANIFEST_PATH" "$HOST_PORT" "$TOKEN" "$MTYPE" "$BODY_SIZE" > "$HDR_FILE"
       cat "$HDR_FILE" manifest.json > "$REQ_FILE"
-      # Use -ign_eof so openssl doesn't exit on stdin close; redirect stdin from file
-      openssl s_client -connect "${HOST_PORT}:443" -quiet -ign_eof < "$REQ_FILE" > "$PUSH_OUT_FILE" 2>&1
+      # Run openssl in subshell with SIGPIPE ignored (exit code 141 = 128+13)
+      (trap '' PIPE; openssl s_client -connect "${HOST_PORT}:443" -quiet -ign_eof < "$REQ_FILE" > "$PUSH_OUT_FILE" 2>&1)
       PUSH_RC=$?
       rm -f "$HDR_FILE" "$REQ_FILE"
       if grep -qE "HTTP/1\.[01] 20[0-9]" "$PUSH_OUT_FILE"; then
