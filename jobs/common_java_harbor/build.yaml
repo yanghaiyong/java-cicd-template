@@ -78,22 +78,35 @@
       ls -la
       echo "blobs dir:"
       ls blobs/
-      echo "blobs/sha256 dir:"
-      ls blobs/sha256/ | head -10
+      echo "blobs/sha256 dir (with sizes):"
+      ls -la blobs/sha256/
+      echo "All files in extracted dir:"
+      find . -type f
       echo "index.json:"
       cat index.json
       echo ""
+      echo "Content of blobs/sha256/* (first 200 chars each):"
+      for f in blobs/sha256/*; do
+        echo "=== $f ($(wc -c < "$f") bytes) ==="
+        head -c 200 "$f"
+        echo ""
+      done
       M_DIGEST=$(cat index.json | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -1)
       echo "M_DIGEST: $M_DIGEST"
       # Strip algorithm prefix to get hex-only path (blobs/sha256/<hex>, not blobs/sha256/sha256:<hex>)
       M_HEX="${M_DIGEST#sha256:}"
       echo "M_HEX: $M_HEX"
+      echo "Looking for manifest blob..."
       if [ -f "blobs/sha256/${M_HEX}" ]; then
         cp "blobs/sha256/${M_HEX}" manifest.json
+        echo "Found at blobs/sha256/${M_HEX}"
       elif [ -f "blobs/sha256/${M_DIGEST}" ]; then
         cp "blobs/sha256/${M_DIGEST}" manifest.json
+        echo "Found at blobs/sha256/${M_DIGEST}"
       else
         echo "ERROR: manifest blob not found at blobs/sha256/${M_HEX} or blobs/sha256/${M_DIGEST}"
+        echo "Available blobs:"
+        ls -la blobs/sha256/
         exit 1
       fi
       echo "manifest.json:"
