@@ -102,11 +102,11 @@
         fi
         URL="https://${REGISTRY}/v2/${REPO}/blobs/uploads/?digest=${digest}"
         echo -n "  [upload] $digest ... "
+        # BusyBox wget has no --method/--body-file; --post-file implicitly uses POST
         UPLOAD_OUT=$(wget --no-check-certificate \
-          --method=POST \
           --header="$BEARER" \
           --header="Content-Type: application/octet-stream" \
-          --body-file="blobs/sha256/${hex}" \
+          --post-file="blobs/sha256/${hex}" \
           "$URL" 2>&1) || UPLOAD_RC=$?
         UPLOAD_RC=${UPLOAD_RC:-0}
         if [ "$UPLOAD_RC" = "0" ]; then
