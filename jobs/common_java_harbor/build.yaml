@@ -112,16 +112,18 @@
       echo "manifest.json:"
       cat manifest.json
       echo ""
-      # JSON is pretty-printed; collapse to single line for sed
-      MANIFEST_ONELINE=$(tr -d '\n' < manifest.json)
-      CONFIG_DIGEST=$(echo "$MANIFEST_ONELINE" | sed -n 's/.*"config":{"digest":"\([^"]*\)".*/\1/p')
-      # Collect layer digests; strip sha256: prefix for filesystem paths
-      LAYER_DIGESTS=$(echo "$MANIFEST_ONELINE" | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' \
-        | grep -v "^${CONFIG_DIGEST}$" | grep -v "^${M_DIGEST}$" \
-        | sed 's/^sha256://')
+      # Extract digest fields directly with grep -o (handles pretty-printed JSON naturally)
+      CONFIG_DIGEST=$(grep -o '"digest": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(sha256:[^"]*\)"/\1/')
+      ALL_DIGESTS=$(grep -o '"digest": "[^"]*"' manifest.json | sed 's/.*"\(sha256:[^"]*\)"/\1/')
+      # Layer digests = all digests except config (manifest digest is from index.json, not here)
+      LAYER_HEXES=$(echo "$ALL_DIGESTS" | grep -v "^${CONFIG_DIGEST}$" | sed 's/^sha256://')
       echo "Manifest digest: $M_DIGEST"
       echo "Config digest: $CONFIG_DIGEST (hex: ${CONFIG_DIGEST#sha256:})"
-      echo "Layers: $(echo "$LAYER_DIGESTS" | wc -l)"
+      echo "All digests in manifest:"
+      echo "$ALL_DIGESTS"
+      echo "Layer hexes:"
+      echo "$LAYER_HEXES"
+      echo "Layers: $(echo "$LAYER_HEXES" | grep -c .)"
 
       # Upload each blob
       upload_blob() {
