@@ -1,6 +1,6 @@
 .docker_build_harbor:
   stage: build
-  image: docker.m.daocloud.io/moby/buildkit:latest
+  image: harbor-ui.test.com/library/buildkit:rootless
   variables:
     DOCKER_CONFIG: /tmp/docker-config
   retry:
