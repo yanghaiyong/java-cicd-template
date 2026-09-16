@@ -76,19 +76,23 @@
       rm -rf oci-extract
       mkdir -p oci-extract && cd oci-extract
       tar -xf /tmp/image.tar
-      # OCI tar structure: blobs/sha256/<digest> where digest is sha256:<hex>
       M_DIGEST=$(cat index.json | sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' | head -1)
-      cp "blobs/sha256/${M_DIGEST}" manifest.json
+      # Strip algorithm prefix to get hex-only path (blobs/sha256/<hex>, not blobs/sha256/sha256:<hex>)
+      M_HEX="${M_DIGEST#sha256:}"
+      cp "blobs/sha256/${M_HEX}" manifest.json
       CONFIG_DIGEST=$(sed -n 's/.*"config":{"digest":"\([^"]*\)".*/\1/p' manifest.json)
-      # Collect all layer digests (skip config which has size:0 in layer list)
-      LAYER_DIGESTS=$(sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' manifest.json | grep -v "^${CONFIG_DIGEST}$" | grep -v "^${M_DIGEST}$")
+      # Collect layer digests; strip sha256: prefix for filesystem paths
+      LAYER_DIGESTS=$(sed -n 's/.*"digest":"\([^"]*\)".*/\1/p' manifest.json \
+        | grep -v "^${CONFIG_DIGEST}$" | grep -v "^${M_DIGEST}$" \
+        | sed 's/^sha256://')
       echo "Manifest digest: $M_DIGEST"
-      echo "Config digest: $CONFIG_DIGEST"
+      echo "Config digest: $CONFIG_DIGEST (hex: ${CONFIG_DIGEST#sha256:})"
       echo "Layers: $(echo "$LAYER_DIGESTS" | wc -l)"
 
       # Upload each blob
       upload_blob() {
-        local digest="$1"
+        local digest="$1"  # full digest like sha256:<hex>
+        local hex="${digest#sha256:}"
         # Check if blob exists (HEAD)
         HEAD_CODE=$(curl -sk -o /dev/null -w "%{http_code}" \
           -H "$BEARER" \
@@ -103,7 +107,7 @@
         curl -sk -X POST \
           -H "$BEARER" \
           -H "Content-Type: application/octet-stream" \
-          --data-binary "@blobs/sha256/${digest}" \
+          --data-binary "@blobs/sha256/${hex}" \
           "$LOC"
         echo ""
       }
