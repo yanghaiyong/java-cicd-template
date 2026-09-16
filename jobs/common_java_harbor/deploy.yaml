@@ -9,7 +9,7 @@
 .k8s_deploy_harbor:
   stage: deploy
   image:
-    name: harbor-ui.test.com/library/alpine:3.19
+    name: harbor-ui.test.com/library/buildkit:kubectl-1.30
     entrypoint: [""]
   variables:
     DOCKER_HOST: tcp://docker:2375
@@ -43,15 +43,7 @@
       echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
-      # Use kubectl binary passed from build stage as artifact (avoids CDN blocks)
-      if [ -f "kubectl-bin/kubectl" ]; then
-        cp kubectl-bin/kubectl /usr/local/bin/kubectl
-        chmod +x /usr/local/bin/kubectl
-        echo "Using kubectl from build artifact"
-      else
-        echo "ERROR: kubectl-bin/kubectl not found in artifacts"
-        exit 1
-      fi
+      # kubectl is pre-installed in the Harbor-hosted image
       kubectl version --client
       # Kubeconfig 认证
       if [ -n "$KUBECONFIG_CONTEXT" ]; then
