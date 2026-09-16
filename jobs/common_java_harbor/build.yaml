@@ -51,14 +51,30 @@
       # Download kubectl binary to pass as artifact (cluster runners can reach dl.k8s.io)
       echo "Downloading kubectl for deploy stage..."
       mkdir -p kubectl-bin
-      # Unset SSL_CERT_FILE only for kubectl download (Harbor CA breaks dl.k8s.io TLS)
       SSL_CERT_FILE_BACKUP="$SSL_CERT_FILE"
       unset SSL_CERT_FILE SSL_CERT_DIR
-      wget --no-check-certificate -q "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl" -O kubectl-bin/kubectl
+      # Retry kubectl download (dl.k8s.io is flaky from cluster)
+      KUBECTL_OK=0
+      for ATTEMPT in 1 2 3 4 5; do
+        echo "  Attempt $ATTEMPT..."
+        if wget --no-check-certificate -q --timeout=30 \
+          "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl" \
+          -O kubectl-bin/kubectl 2>&1; then
+          if [ -s kubectl-bin/kubectl ] && head -c 4 kubectl-bin/kubectl | grep -q "ELF"; then
+            KUBECTL_OK=1
+            break
+          fi
+        fi
+        echo "  Retry after 5s..."
+        sleep 5
+      done
       export SSL_CERT_FILE="$SSL_CERT_FILE_BACKUP"
+      if [ "$KUBECTL_OK" = "0" ]; then
+        echo "ERROR: failed to download kubectl after 5 attempts"
+        exit 1
+      fi
       chmod +x kubectl-bin/kubectl
       ls -la kubectl-bin/kubectl
-      head -c 4 kubectl-bin/kubectl | od -c | head -1
     - |
       echo "========================================="
       echo "Phase 2: Pushing to Harbor via v2 API..."
