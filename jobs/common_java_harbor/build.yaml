@@ -152,8 +152,8 @@
         if grep -qE "HTTP/1\.[01] 20[0-9]" "$PUSH_OUT_FILE"; then
           echo "Manifest pushed via PUT"
         else
-          echo "PUT failed:"
-          cat "$PUSH_OUT_FILE" | grep -v "verify\|depth=" | head -5
+          echo "PUT response (excluding TLS handshake):"
+          grep -v "verify\|depth=\|CONNECTED\|Certificate chain\| subject:\| issuer:\| start date\| SSL certificate\|^\-\-\-\|^[0-9]" "$PUSH_OUT_FILE" | head -20
           exit 1
         fi
         rm -f "$PUSH_OUT_FILE"
