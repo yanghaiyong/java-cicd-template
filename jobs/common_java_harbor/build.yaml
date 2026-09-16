@@ -179,40 +179,34 @@
         upload_blob "sha256:${d}"
       done
 
-      echo "Pushing manifest..."
+echo "Pushing manifest..."
       MTYPE=$(grep -o '"mediaType": "[^"]*"' manifest.json | head -1 | sed 's/.*"\(application[^"]*\)".*/\1/')
       MTYPE=${MTYPE:-application/vnd.oci.image.manifest.v1+json}
-      # Try wget with --post-file first (BusyBox may accept POST for manifest)
-      if wget --no-check-certificate \
-        --header="$BEARER" \
-        --header="Content-Type: ${MTYPE}" \
-        --post-file=manifest.json \
-        "https://${REGISTRY}/v2/${REPO}/manifests/${TAG}" -O /tmp/manifest-resp.txt 2>&1; then
-        echo "Manifest pushed via POST"
-        cat /tmp/manifest-resp.txt | head -3
-      else
-        echo "POST failed, trying PUT via openssl..."
-        if ! command -v openssl >/dev/null 2>&1; then
-          echo "ERROR: openssl not found, cannot do PUT"
-          exit 1
-        fi
-        HOST_PORT="${REGISTRY}"
-        MANIFEST_PATH="/v2/${REPO}/manifests/${TAG}"
-        BODY_SIZE=$(wc -c < manifest.json)
-        HDR_FILE=$(mktemp)
-        printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
-          "$MANIFEST_PATH" "$HOST_PORT" "$TOKEN" "$MTYPE" "$BODY_SIZE" > "$HDR_FILE"
-        PUSH_OUT_FILE=$(mktemp)
-        cat "$HDR_FILE" manifest.json | openssl s_client -connect "${HOST_PORT}:443" -quiet > "$PUSH_OUT_FILE" 2>&1 || true
-        rm -f "$HDR_FILE"
-        if grep -qE "HTTP/1\.[01] 20[0-9]" "$PUSH_OUT_FILE"; then
-          echo "Manifest pushed via PUT"
-        else
-          echo "PUT response (excluding TLS handshake):"
-          grep -v "verify\|depth=\|CONNECTED\|Certificate chain\| subject:\| issuer:\| start date\| SSL certificate\|^\-\-\-\|^[0-9]" "$PUSH_OUT_FILE" | head -20
-          exit 1
-        fi
-        rm -f "$PUSH_OUT_FILE"
+      # Ignore SIGPIPE to survive openssl pipe closure
+      trap '' PIPE 2>/dev/null || true
+      if ! command -v openssl >/dev/null 2>&1; then
+        echo "ERROR: openssl not found, cannot do PUT"
+        exit 1
       fi
+      HOST_PORT="${REGISTRY}"
+      MANIFEST_PATH="/v2/${REPO}/manifests/${TAG}"
+      BODY_SIZE=$(wc -c < manifest.json)
+      HDR_FILE=$(mktemp); PUSH_OUT_FILE=$(mktemp)
+      printf 'PUT %s HTTP/1.1\r\nHost: %s\r\nAuthorization: Bearer %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' \
+        "$MANIFEST_PATH" "$HOST_PORT" "$TOKEN" "$MTYPE" "$BODY_SIZE" > "$HDR_FILE"
+      set +e +o pipefail 2>/dev/null || true
+      cat "$HDR_FILE" manifest.json | openssl s_client -connect "${HOST_PORT}:443" -quiet > "$PUSH_OUT_FILE" 2>&1
+      PUSH_RC=$?
+      set -o pipefail 2>/dev/null || true
+      rm -f "$HDR_FILE"
+      if grep -qE "HTTP/1\.[01] 20[0-9]" "$PUSH_OUT_FILE"; then
+        echo "Manifest pushed via PUT (rc=$PUSH_RC)"
+      else
+        echo "PUT response (excluding TLS handshake):"
+        grep -v "verify\|depth=\|CONNECTED\|Certificate\|^\-\-\-" "$PUSH_OUT_FILE" | head -10
+        rm -f "$PUSH_OUT_FILE"
+        exit 1
+      fi
+      rm -f "$PUSH_OUT_FILE"
       echo "Push complete: ${CI_REGISTRY_FULL_IMAGE}"
   needs: ["package"]
