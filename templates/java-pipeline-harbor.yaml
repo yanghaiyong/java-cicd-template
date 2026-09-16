@@ -52,7 +52,7 @@ variables:
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
   DOCKER_IMAGE: "harbor-ui.test.com/library/buildkit:rootless"
-  KUBECTL_IMAGE: "bitnami/kubectl:1.30"
+  KUBECTL_IMAGE: "harbor-ui.test.com/library/alpine:3.19"
 
   # ============================================
   # 镜像仓库 (Harbor)
