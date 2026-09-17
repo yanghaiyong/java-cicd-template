@@ -10,11 +10,13 @@
 .aggregate_docker_build_harbor:
   stage: build
   image: docker:24.0.7-dind
-  services:
-    - docker:24.0.7-dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
+    # DinD service 由 runner 统一注入(config.toml [[runners.kubernetes.services]]),此处不得再声明 services:
+    # 重复声明会让同一 pod 出现两个 dockerd 抢 :2375。Harbor CA 由 runner 卷挂载到 /etc/docker/certs.d,
+    # 而 docker:24 的 BuildKit 不读该目录/系统信任库,故必须使用 classic builder。
+    DOCKER_BUILDKIT: "0"
   retry:
     max: 2
     when:
@@ -74,11 +76,13 @@
 .aggregate_docker_build_all_harbor:
   stage: build
   image: docker:24.0.7-dind
-  services:
-    - docker:24.0.7-dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
+    # DinD service 由 runner 统一注入(config.toml [[runners.kubernetes.services]]),此处不得再声明 services:
+    # 重复声明会让同一 pod 出现两个 dockerd 抢 :2375。Harbor CA 由 runner 卷挂载到 /etc/docker/certs.d,
+    # 而 docker:24 的 BuildKit 不读该目录/系统信任库,故必须使用 classic builder。
+    DOCKER_BUILDKIT: "0"
   retry:
     max: 2
     when:
