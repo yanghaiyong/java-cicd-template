@@ -9,7 +9,7 @@
 
 .aggregate_docker_build_harbor:
   stage: build
-  image: docker:24.0.7-dind
+  image: $DOCKER_IMAGE
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
@@ -42,7 +42,7 @@
     - |
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE/$APP_NAME:$IMAGE_TAG"
       # 构建镜像
-      DOCKERFILE_PATH_CALC="$APP_MAVEN_PATH/src/main/docker/Dockerfile"
+        DOCKERFILE_PATH_CALC="$APP_MAVEN_PATH/${DOCKERFILE_PATH}"
       [ -f "$DOCKERFILE_PATH_CALC" ] || DOCKERFILE_PATH_CALC="Dockerfile"
       echo "Dockerfile: $DOCKERFILE_PATH_CALC"
       docker build \
@@ -75,7 +75,7 @@
 
 .aggregate_docker_build_all_harbor:
   stage: build
-  image: docker:24.0.7-dind
+  image: $DOCKER_IMAGE
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
@@ -114,7 +114,7 @@
         echo "========================================="
         CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE/$app_name_lower:$IMAGE_TAG"
         echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
-        DOCKERFILE_PATH_CALC="$app_path/src/main/docker/Dockerfile"
+        DOCKERFILE_PATH_CALC="$app_path/${DOCKERFILE_PATH}"
         [ -f "$DOCKERFILE_PATH_CALC" ] || DOCKERFILE_PATH_CALC="Dockerfile"
         echo "Dockerfile: $DOCKERFILE_PATH_CALC"
         if docker build \

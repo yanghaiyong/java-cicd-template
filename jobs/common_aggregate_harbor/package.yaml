@@ -29,19 +29,19 @@
   after_script:
     - |
       echo "构建产物:"
-      ls -lh $APP_MAVEN_PATH/target/*.jar 2>/dev/null || echo "未找到 JAR"
+      ls -lh ${APP_MAVEN_PATH}/${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR"
   artifacts:
-    name: "$APP_NAME-$CI_COMMIT_REF_NAME"
+    name: '$ARTIFACTS_NAME'
     when: on_success
     expire_in: 30 days
     paths:
-      - $APP_MAVEN_PATH/target/*.jar
+      - ${APP_MAVEN_PATH}/${ARTIFACTS}*.jar
   cache:
     policy: pull-push
-    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    key: "maven-aggregate-${CI_COMMIT_REF_SLUG}"
     paths:
       - .m2/repository
-      - $APP_MAVEN_PATH/target/
+      - ${APP_MAVEN_PATH}/${CACHE_DIR}
 
 .aggregate_mvn_package_all_harbor:
   stage: package
@@ -81,13 +81,13 @@
     when: on_success
     expire_in: 7 days
     paths:
-      - SpringBootStarry/Starry*/target/*.jar
+      - ${AGGREGATE_MODULES_GLOB}/${ARTIFACTS}*.jar
   cache:
     policy: pull-push
-    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    key: "maven-aggregate-${CI_COMMIT_REF_SLUG}"
     paths:
       - .m2/repository
-      - SpringBootStarry/Starry*/target/
+      - ${AGGREGATE_MODULES_GLOB}/${CACHE_DIR}
 
 .aggregate_maven_compile_harbor:
   stage: package
