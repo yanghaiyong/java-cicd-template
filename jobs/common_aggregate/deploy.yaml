@@ -43,7 +43,7 @@
       echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
       echo "========================================="
       # 拼接 K8s YAML 路径: $APP_MAVEN_PATH/src/main/k8s/<env>/deploy.yaml
-      export K8S_YAML="${APP_MAVEN_PATH}/src/main/k8s/${K8S_ENV}/deploy.yaml"
+      export K8S_YAML="${APP_MAVEN_PATH}/${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
       echo "K8s YAML: $K8S_YAML"
       # Kubeconfig 认证 (context 优先, content 备用)
       if [ -n "$KUBECONFIG_CONTEXT" ]; then
@@ -61,7 +61,7 @@
       kubectl version --client
   script:
     - |
-      export K8S_YAML="${APP_MAVEN_PATH}/src/main/k8s/${K8S_ENV}/deploy.yaml"
+      export K8S_YAML="${APP_MAVEN_PATH}/${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
 
       # 镜像标签
       if [ -n "$CI_COMMIT_TAG" ]; then
@@ -209,7 +209,7 @@
         echo "========================================="
 
         # 拼接 K8s YAML 路径
-        K8S_YAML="${app_path}/src/main/k8s/${K8S_ENV}/deploy.yaml"
+        K8S_YAML="${app_path}/${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
         echo "K8s YAML: $K8S_YAML"
 
         # 检查 K8s YAML

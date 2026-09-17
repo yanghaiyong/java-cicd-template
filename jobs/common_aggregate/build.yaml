@@ -47,7 +47,7 @@
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
 
       # 构建镜像
-      DOCKERFILE_PATH_CALC="$APP_MAVEN_PATH/src/main/docker/Dockerfile"
+      DOCKERFILE_PATH_CALC="$APP_MAVEN_PATH/${DOCKERFILE_PATH}"
       [ -f "$DOCKERFILE_PATH_CALC" ] || DOCKERFILE_PATH_CALC="Dockerfile"
       echo "Dockerfile: $DOCKERFILE_PATH_CALC"
 
@@ -137,7 +137,7 @@
         echo "镜像地址: $CI_REGISTRY_FULL_IMAGE"
 
         # 构建镜像
-        DOCKERFILE_PATH_CALC="$app_path/src/main/docker/Dockerfile"
+        DOCKERFILE_PATH_CALC="$app_path/${DOCKERFILE_PATH}"
         [ -f "$DOCKERFILE_PATH_CALC" ] || DOCKERFILE_PATH_CALC="Dockerfile"
         echo "Dockerfile: $DOCKERFILE_PATH_CALC"
 

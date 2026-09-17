@@ -74,6 +74,21 @@ variables:
   TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
 
   # ============================================
+  # [通用] 与 common-java-pipeline.yaml 同名同值
+  #   本段只放与镜像仓库无关的变量;同名同值是刻意约定。
+  # ============================================
+  CACHE_DIR: 'target/'
+  ARTIFACTS: 'target/'
+  ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
+  JUNIT_REPORT_PATH: 'target/surefire-reports/'
+  JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
+  JACOCO_REPORT_DIR: 'target/site/jacoco/'
+  AGGREGATE_MODULES_GLOB: 'SpringBootStarry/Starry*'
+  K8S_BASE_PATH: "src/main/k8s"
+  K8S_FILE: "deploy.yaml"
+  DOCKERFILE_PATH: "src/main/docker/Dockerfile"
+
+  # ============================================
   # K8s 配置
   # ============================================
   SERVICE_TYPE: "ClusterIP"
