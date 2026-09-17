@@ -28,16 +28,16 @@
   after_script:
     - |
       echo "构建产物:"
-      ls -lh target/*.jar 2>/dev/null || echo "未找到 JAR"
+      ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR"
   artifacts:
-    name: "$APP_NAME-$CI_COMMIT_REF_NAME"
+    name: '$ARTIFACTS_NAME'
     when: on_success
     expire_in: 30 days
     paths:
-      - target/*.jar
+      - ${ARTIFACTS}*.jar
   cache:
     policy: pull-push
-    key: "maven-$CI_COMMIT_REF_SLUG"
+    key: "maven-${CI_COMMIT_REF_SLUG}"
     paths:
       - .m2/repository
-      - target/
+      - ${CACHE_DIR}

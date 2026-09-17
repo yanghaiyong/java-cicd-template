@@ -1,12 +1,11 @@
 .docker_build_harbor:
   stage: build
-  image: docker:24
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
     # DinD service 由 runner 统一注入(config.toml [[runners.kubernetes.services]]),此处不得再声明 services:
     # 重复声明会让同一 pod 出现两个 dockerd 抢 :2375 且其中之一缺少 Harbor CA 配置。
-    # Harbor CA 由 runner 的 config_map 卷挂载到所有容器 /etc/docker/certs.d/harbor-ui.test.com;
+    # Harbor CA 由 runner 的 config_map 卷挂载到所有容器 /etc/docker/certs.d/$CI_REGISTRY;
     # docker:24 的 BuildKit 不读 certs.d/系统信任库,必须使用 classic builder。
     DOCKER_BUILDKIT: "0"
   retry:
@@ -23,7 +22,7 @@
       fi
       export IMAGE_TAG
       export CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
-      # CA cert already mounted at /etc/docker/certs.d/harbor-ui.test.com via ConfigMap
+      # CA cert already mounted at /etc/docker/certs.d/$CI_REGISTRY via ConfigMap
       # Wait for docker daemon to be ready
       for i in 1 2 3 4 5 6 7 8 9 10; do
         if docker info >/dev/null 2>&1; then
@@ -46,7 +45,7 @@
         --build-arg VCS_REF="$CI_COMMIT_SHA" \
         --build-arg VERSION="$IMAGE_TAG" \
         -t "$CI_REGISTRY_FULL_IMAGE" \
-        -f "${APP_MAVEN_PATH:-.}/src/main/docker/Dockerfile" \
+        -f "${APP_MAVEN_PATH:+$APP_MAVEN_PATH/}${DOCKERFILE_PATH:-Dockerfile}" \
         "${APP_MAVEN_PATH:-.}"
     - |
       echo "========================================="

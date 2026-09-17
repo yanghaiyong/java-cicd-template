@@ -48,26 +48,29 @@ stages:
 
 variables:
   # ============================================
-  # 镜像变量 (Harbor 版本)
-  # ============================================
-  MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
-  DOCKER_IMAGE: "docker:24"
-  KUBECTL_IMAGE: "docker.io/bitnamilegacy/kubectl:1.30.3"
-
-  # ============================================
-  # 镜像仓库 (Harbor)
-  # ============================================
-  CI_REGISTRY: "harbor-ui.test.com"
-  CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
-  CI_REGISTRY_USER: ""
-  CI_REGISTRY_PASSWORD: ""
-
-  # ============================================
-  # Maven 默认值
+  # [通用] 与 common-java-pipeline.yaml 同名同值
+  #   本段只放与镜像仓库无关的变量;同名同值是刻意约定,不要在此改成 Harbor 专属值,
+  #   需要不同值请放到下方 [Harbor 专有] 段。
   # ============================================
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
   BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
   TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+
+  # 构建产物 / 测试报告
+  CACHE_DIR: 'target/'
+  ARTIFACTS: 'target/'
+  ARTIFACTS_NAME: '$CI_JOB_NAME-$CI_COMMIT_REF_NAME'
+  JUNIT_REPORT_PATH: 'target/surefire-reports/'
+  JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
+  # common_java 无此项;Harbor 保留 jacoco HTML 目录作为 artifacts 才需要
+  JACOCO_REPORT_DIR: 'target/site/jacoco/'
+
+  # K8s 路径与名称
+  APP_NAME: "$CI_PROJECT_NAME"
+  K8S_BASE_PATH: "src/main/k8s"
+  K8S_ENV: "dev"
+  K8S_FILE: "deploy.yaml"
+  K8S_NAMESPACE: 'app-${K8S_ENV}'
 
   # ============================================
   # K8s 配置
@@ -104,6 +107,20 @@ variables:
   HPA_MEMORY_THRESHOLD: "80"
   HPA_SCALE_DOWN_WINDOW: "300"
 
+  # ============================================
+  # [Harbor 专有] 需特殊值,勿与 common-java-pipeline.yaml 直接对齐
+  # ============================================
+  MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
+  DOCKER_IMAGE: "docker:24"
+  KUBECTL_IMAGE: "docker.io/bitnamilegacy/kubectl:1.30.3"
+  TRIVY_IMAGE: "$CI_REGISTRY/library/trivy:latest"
+  DOCKERFILE_PATH: "src/main/docker/Dockerfile"
+  IMAGE_PULL_SECRETS: "harbor-secret"
+  CI_REGISTRY: "harbor-ui.test.com"
+  CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
+  CI_REGISTRY_USER: ""
+  CI_REGISTRY_PASSWORD: ""
+
 # =============================================================================
 # 阶段 1: Maven 构建
 # =============================================================================
@@ -131,6 +148,7 @@ test:
 # =============================================================================
 build:
   extends: .docker_build_harbor
+  image: $DOCKER_IMAGE
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
 

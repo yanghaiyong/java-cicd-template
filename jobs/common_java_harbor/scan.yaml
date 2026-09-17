@@ -6,7 +6,7 @@
 
 .trivy_scan_harbor:
   stage: scan
-  image: harbor-ui.test.com/library/trivy:latest
+  image: $TRIVY_IMAGE
   variables:
     DOCKER_CONFIG: /tmp/docker-config
   retry:
