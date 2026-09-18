@@ -10,6 +10,16 @@
 .docker_build_harbor:
   stage: build
   when: on_success
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_pending_with_matching_runners
+      - stuck_pending_no_matching_runners
+      - no_updates_running
+      - no_updates_canceling
+      - server_timeout_running
+      - server_timeout_canceling
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
