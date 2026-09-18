@@ -133,58 +133,46 @@ variables:
   # CI_REGISTRY_PASSWORD: ""
 
 # =============================================================================
+# 顶层缓存(与 common-java-pipeline.yaml 一致)
+# =============================================================================
+cache:
+  paths:
+    - .m2/repository
+    - ${CACHE_DIR}
+
+# =============================================================================
 # 阶段 1: Maven 构建
 # =============================================================================
 package:
+  stage: package
   extends: .mvn_build_harbor
   image: $MAVEN_IMAGE
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH'
-    - if: '$CI_COMMIT_TAG'
 
 # =============================================================================
 # 阶段 2: 单元测试
 # =============================================================================
 test:
+  stage: test
   extends: .test_harbor
   image: $MAVEN_IMAGE
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH'
-    - if: '$CI_COMMIT_TAG'
+  needs: ["package"]
 
 # =============================================================================
 # 阶段 3: Docker 镜像构建
 # =============================================================================
 build:
+  stage: build
   extends: .docker_build_harbor
   image: $DOCKER_IMAGE
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
+  needs: ["package"]
 
 # =============================================================================
 # 阶段 5: Kubernetes 部署
 # =============================================================================
 deploy:
+  stage: deploy
   extends: .k8s_deploy_harbor
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      variables:
-        K8S_ENV: "dev"
-        K8S_NAMESPACE: "app-dev"
-    - if: '$CI_COMMIT_BRANCH == "test"'
-      variables:
-        K8S_ENV: "test"
-        K8S_NAMESPACE: "app-test"
-    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"'
-      variables:
-        K8S_ENV: "pre-prod"
-        K8S_NAMESPACE: "app-pre-prod"
-    - if: '$CI_COMMIT_TAG'
-      variables:
-        K8S_ENV: "prod"
-        K8S_NAMESPACE: "app-prod"
+  needs: ["build"]
