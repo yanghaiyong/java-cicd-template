@@ -151,8 +151,9 @@
       echo "YAML 验证通过"
       
       # 创建 namespace（如不存在）
+      # 命名空间级 SA(如 ci-deploy) 无集群级权限时 get 会 Forbidden, 故降级为 best-effort
       if ! kubectl get namespace ${K8S_NAMESPACE} >/dev/null 2>&1; then
-        kubectl create namespace ${K8S_NAMESPACE}
+        kubectl create namespace ${K8S_NAMESPACE} || echo "警告: 无权限创建 namespace ${K8S_NAMESPACE}, 继续部署(假定已存在)"
       fi
       
       # 部署应用
