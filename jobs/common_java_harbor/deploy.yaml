@@ -1,16 +1,13 @@
 # ============================================
-# 单体 Java 项目 K8s 部署模板 (Harbor 版本)
+# 单体 Java 项目 K8s 部署模板 (Harbor 版本) - 支持多环境自动识别
 # ============================================
-# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
-# 与 common_java/deploy.yaml 的区别:
+# 与 common_java/deploy.yaml 结构一致; Harbor 环境必需项:
 #   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE:$TAG
-#   - 支持 Harbor 镜像拉取 Secret
+#   - DOCKER_CONFIG 按项目级凭据生成 + 创建 Harbor imagePullSecret
 
 .k8s_deploy_harbor:
   stage: deploy
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+  when: on_success
   retry:
     max: 2
     when:
@@ -25,7 +22,7 @@
       variables:
         K8S_ENV: "test"
         K8S_NAMESPACE: "app-test"
-    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
       variables:
         K8S_ENV: "pre-prod"
         K8S_NAMESPACE: "app-pre-prod"
@@ -36,48 +33,67 @@
   before_script:
     - |
       echo "========================================="
-      echo "K8s 部署 (Harbor 模式)"
-      echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
-      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
-      echo "========================================="
-      # kubectl is pre-installed in the Harbor-hosted image
-      kubectl version --client
-      # Kubeconfig 认证
+      echo "Kubernetes 部署开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "环境: $K8S_ENV"
+      echo "K8s 基础路径: $K8S_BASE_PATH"
+      echo "K8s 环境: $K8S_ENV"
+      echo "K8s 文件: $K8S_FILE"
+      
+      # 拼接完整的 K8s YAML 路径
+      export K8S_YAML="${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
+      echo "K8s 配置文件: $K8S_YAML"
+      echo "K8s Namespace: $K8S_NAMESPACE"
+      
+      # 优先使用 KUBECONFIG_CONTEXT 这个是name方式
+      # 两种方式 KUBECONFIG_CONTENT 这个是base64的
       if [ -n "$KUBECONFIG_CONTEXT" ]; then
         echo "使用 KUBECONFIG_CONTEXT: $KUBECONFIG_CONTEXT"
-        export KUBECONFIG=""
+        export KUBECONFIG=""  # 清除旧的 kubeconfig
         kubectl config use-context $KUBECONFIG_CONTEXT
       elif [ -n "$KUBECONFIG_CONTENT" ]; then
-        printf '%s' "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
+        echo "$KUBECONFIG_CONTENT" | base64 -d > /tmp/kubeconfig
         chmod 600 /tmp/kubeconfig
         export KUBECONFIG=/tmp/kubeconfig
+        echo "Kubeconfig 配置完成"
       else
-        echo "错误: KUBECONFIG_CONTEXT 或 KUBECONFIG_CONTENT 未配置"
+        echo "错误: KUBECONFIG_CONTEXT 或 KUBECONFIG_CONTENT 变量未配置"
         exit 1
       fi
       kubectl version --client
   script:
     - |
-      export K8S_YAML="${APP_MAVEN_PATH:+$APP_MAVEN_PATH/}${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
-      # 镜像标签
+      # 拼接完整的 K8s YAML 路径
+      export K8S_YAML="${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
+      
+      echo "========================================="
+      echo "开始部署应用"
+      
+      # 确定镜像标签策略
       if [ -n "$CI_COMMIT_TAG" ]; then
+        # 生产环境：使用 Git Tag
         IMAGE_TAG=$CI_COMMIT_TAG
+        echo "正式发布 - 使用 Tag: $IMAGE_TAG"
       else
+        # 其他环境：使用分支名+短SHA
         IMAGE_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
+        echo "非生产环境 - 使用分支标签: $IMAGE_TAG"
       fi
+      
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE:$IMAGE_TAG"
       echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
-      # ${IMAGE_PULL_SECRETS} 由模板变量提供; ${DOCKER_CONFIG} 按 CI 凭据在此生成
+      
+      # ${IMAGE_PULL_SECRETS} 由模板变量提供; ${DOCKER_CONFIG} 按 Harbor 凭据在此生成
       DOCKER_CONFIG=$(printf '{"auths":{"%s":{"username":"%s","password":"%s","auth":"%s"}}}' \
         "$CI_REGISTRY" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" \
         "$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')" | base64 | tr -d '\n')
-      echo "K8s YAML: $K8S_YAML"
-      # 检查 K8s YAML
+      
+      # 检查 K8s YAML 文件
       if [ ! -f "$K8S_YAML" ]; then
-        echo "错误: K8s YAML 不存在: $K8S_YAML"
+        echo "错误: K8S_YAML 文件不存在: $K8S_YAML"
         exit 1
       fi
-      # 创建 Harbor Secret (如果不存在)
+      
+      # 创建 Harbor Secret（如不存在）
       if ! kubectl get secret "${IMAGE_PULL_SECRETS}" -n ${K8S_NAMESPACE} >/dev/null 2>&1; then
         kubectl create secret docker-registry "${IMAGE_PULL_SECRETS}" \
           --docker-server=$CI_REGISTRY \
@@ -85,20 +101,63 @@
           --docker-password=$CI_REGISTRY_PASSWORD \
           -n ${K8S_NAMESPACE}
       fi
-      # sed 替换 manifest 中所有占位符(变量默认值见 templates/java-pipeline-harbor.yaml)
-      for v in APP_NAME K8S_NAMESPACE CI_REGISTRY_FULL_IMAGE IMAGE_TAG IMAGE_PULL_SECRETS DOCKER_CONFIG \
-               SERVICE_TYPE SERVICE_PORT CONTAINER_PORT IMAGE_PULL_POLICY REPLICAS MAX_SURGE MAX_UNAVAILABLE \
-               MEMORY_REQUEST MEMORY_LIMIT CPU_REQUEST CPU_LIMIT HEALTH_CHECK_PATH \
-               LIVENESS_INITIAL_DELAY READINESS_INITIAL_DELAY JAVA_MIN_HEAP JAVA_MAX_HEAP \
-               HPA_MIN_REPLICAS HPA_MAX_REPLICAS HPA_CPU_THRESHOLD HPA_MEMORY_THRESHOLD; do
-        eval "val=\${$v}"
-        if [ -n "$val" ]; then
-          sed -i "s|\${$v}|$val|g" $K8S_YAML
-        fi
-      done
-      # 部署
+      
+      # 替换 K8s YAML 中的变量（使用 | 分隔符避免变量中特殊字符冲突）
+      echo "替换 K8s YAML 变量..."
+      
+      # 处理 Secret：如果没有配置 DOCKER_CONFIG，则删除 Secret 部分
+      if [ -z "$DOCKER_CONFIG" ]; then
+        sed -i "/^---$/,/^kind: Secret/d" $K8S_YAML
+        sed -i "/imagePullSecrets:/d" $K8S_YAML
+      else
+        sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
+        sed -i "s|\${DOCKER_CONFIG}|$DOCKER_CONFIG|g" $K8S_YAML
+      fi
+      
+      sed -i "s|\${APP_NAME}|$APP_NAME|g" $K8S_YAML
+      sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
+      sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
+      sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" $K8S_YAML
+      sed -i "s|\${SERVICE_TYPE}|$SERVICE_TYPE|g" $K8S_YAML
+      sed -i "s|\${SERVICE_PORT}|$SERVICE_PORT|g" $K8S_YAML
+      sed -i "s|\${CONTAINER_PORT}|$CONTAINER_PORT|g" $K8S_YAML
+      sed -i "s|\${IMAGE_PULL_POLICY}|$IMAGE_PULL_POLICY|g" $K8S_YAML
+      sed -i "s|\${REPLICAS}|$REPLICAS|g" $K8S_YAML
+      sed -i "s|\${MAX_SURGE}|$MAX_SURGE|g" $K8S_YAML
+      sed -i "s|\${MAX_UNAVAILABLE}|$MAX_UNAVAILABLE|g" $K8S_YAML
+      sed -i "s|\${MEMORY_REQUEST}|$MEMORY_REQUEST|g" $K8S_YAML
+      sed -i "s|\${CPU_REQUEST}|$CPU_REQUEST|g" $K8S_YAML
+      sed -i "s|\${MEMORY_LIMIT}|$MEMORY_LIMIT|g" $K8S_YAML
+      sed -i "s|\${CPU_LIMIT}|$CPU_LIMIT|g" $K8S_YAML
+      sed -i "s|\${HEALTH_CHECK_PATH}|$HEALTH_CHECK_PATH|g" $K8S_YAML
+      sed -i "s|\${LIVENESS_INITIAL_DELAY}|$LIVENESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${READINESS_INITIAL_DELAY}|$READINESS_INITIAL_DELAY|g" $K8S_YAML
+      sed -i "s|\${HPA_MIN_REPLICAS}|$HPA_MIN_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_MAX_REPLICAS}|$HPA_MAX_REPLICAS|g" $K8S_YAML
+      sed -i "s|\${HPA_CPU_THRESHOLD}|$HPA_CPU_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_MEMORY_THRESHOLD}|$HPA_MEMORY_THRESHOLD|g" $K8S_YAML
+      sed -i "s|\${HPA_SCALE_DOWN_WINDOW}|$HPA_SCALE_DOWN_WINDOW|g" $K8S_YAML
+      sed -i "s|\${JAVA_MIN_HEAP}|$JAVA_MIN_HEAP|g" $K8S_YAML
+      sed -i "s|\${JAVA_MAX_HEAP}|$JAVA_MAX_HEAP|g" $K8S_YAML
+      echo "变量替换完成"
+      
+      # 先 dry-run 验证 YAML 语法
+      echo "验证 YAML 语法..."
+      if ! kubectl apply --dry-run=client -f $K8S_YAML -n ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        echo "错误: YAML 验证失败，请检查配置文件"
+        kubectl apply --dry-run=client -f $K8S_YAML -n ${K8S_NAMESPACE} 2>&1 || true
+        exit 1
+      fi
+      echo "YAML 验证通过"
+      
+      # 创建 namespace（如不存在）
+      if ! kubectl get namespace ${K8S_NAMESPACE} >/dev/null 2>&1; then
+        kubectl create namespace ${K8S_NAMESPACE}
+      fi
+      
+      # 部署应用
       if kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}; then
-        echo "部署成功,等待就绪..."
+        echo "部署成功，等待就绪..."
         if kubectl rollout status deployment/${APP_NAME} -n ${K8S_NAMESPACE} --timeout=300s; then
           echo "应用已就绪"
         else
@@ -109,10 +168,17 @@
           exit 1
         fi
       else
-        echo "部署失败"
+        echo "部署失败！"
         exit 1
       fi
-      echo "部署完成!"
+      
+      echo "部署完成！"
       kubectl get deployments -n ${K8S_NAMESPACE}
       kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME}
+  after_script:
+    - |
+      echo "========================================="
+      echo "Kubernetes 部署完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+  cache:
+    policy: push
   needs: ["build"]
