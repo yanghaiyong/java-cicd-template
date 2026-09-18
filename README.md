@@ -110,6 +110,46 @@ GitLab 内置变量可直接使用:
 | `CI_COMMIT_BRANCH` | 当前提交的分支名称 |
 | `CI_COMMIT_REF_NAME` | 当前提交的分支或标签名称 |
 
+## 🔒 变量契约（common_java ↔ java-pipeline-harbor）
+
+> **目标**：两个单体家族的**同名变量同值 → 产物一致**；确需特殊值时必须登记于本表，不得私下改。
+> **变量优先级**（GitLab 官方）：项目级 CI/CD 变量 > job 级变量 > 顶层/default 变量（含 include 的模板 `variables`）。
+
+| # | 变量 | `common-java-pipeline.yaml` | `java-pipeline-harbor.yaml` | 处置 | 说明 |
+|---|------|------------------------------|------------------------------|------|------|
+| 1 | `MAVEN_IMAGE` | `maven:3.9.6-eclipse-temurin-17` | 同左 | 统一 | Maven 版本影响 jar |
+| 2 | `BUILD_SHELL` | `-s /etc/maven/settings.xml` | `-s settings.xml` | **暂挂待议** | 内网 Nexus3 vs 项目自带(公网) |
+| 3 | `TEST_SHELL` | 同 #2 | 同 #2 | **暂挂待议** | 同上 |
+| 4 | `DOCKER_IMAGE` | `docker:cli` | `docker:24`（job 级 `DOCKER_BUILDKIT=0`） | Harbor 专有 | classic builder；Docker 25+ 已移除 |
+| 5 | `KUBECTL_IMAGE` | `bitnami/kubectl:latest` | `docker.io/bitnamilegacy/kubectl:1.30.3` | 各自保留 | 公网 `bitnami/kubectl:1.30.x` tag 已 404 |
+| 6 | `DOCKERFILE_PATH` | `src/main/docker/Dockerfile` | 同左 | 统一 | 全项目目录约定 |
+| 7 | `CI_REGISTRY` | `k8s-node-1:5000` | `harbor-ui.test.com` | 各自保留 | 环境绑定 |
+| 8 | `IMAGE_PULL_SECRETS` | `docker-secret` | `harbor-secret` | 各自保留 | 由 deploy job 创建 |
+| 9 | `CI_REGISTRY_USER` / `CI_REGISTRY_PASSWORD` | 注释（走 `DOCKER_AUTH_CONFIG`） | 注释 | 项目级注入 | 模板不设默认值 |
+| 10 | `SKYWALKING_AGENT_IMAGE` | `apache/skywalking-java-agent:9.6.0-java17` | 同左 | 统一 | |
+| 11 | `CI_DEBUG_TRACE` | `"false"` | 同左 | 统一 | |
+| 12 | `GIT_CHECKOUT` | `"true"` | 同左 | 统一 | |
+| 13 | `CI_REGISTRY_FULL_IMAGE` | `$CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA` | 同左 | 统一 | 仅作默认值，job 内会重算 |
+| 14 | `DOCKER_CONFIG` | 内置 base64（`k8s-node-1:5000`） | — | common_java 专有 | 非-Harbor 的 imagePullSecret 内容 |
+| 15 | `JACOCO_REPORT_DIR` | `target/site/jacoco/` | 同左 | 统一 | test 上传产物集合一致 |
+| 16 | `TRIVY_IMAGE` | — | `$CI_REGISTRY/library/trivy:latest` | Harbor 专有 | 内网离线，用 Harbor 上的 trivy |
+
+### 其余 [通用] 同名同值变量
+
+`MAVEN_OPTS`、`CACHE_DIR` / `ARTIFACTS` / `ARTIFACTS_NAME`、`JUNIT_REPORT_PATH` / `JACOCO_REPORT_PATH`、
+`APP_NAME`、`K8S_BASE_PATH` / `K8S_FILE` / `K8S_ENV` / `K8S_NAMESPACE`、
+`SERVICE_TYPE` / `SERVICE_PORT` / `CONTAINER_PORT` / `IMAGE_PULL_POLICY`、
+`REPLICAS` / `MAX_SURGE` / `MAX_UNAVAILABLE`、
+`MEMORY_REQUEST` / `CPU_REQUEST` / `MEMORY_LIMIT` / `CPU_LIMIT`、
+`HEALTH_CHECK_PATH` / `LIVENESS_INITIAL_DELAY` / `READINESS_INITIAL_DELAY`、
+`JAVA_MIN_HEAP` / `JAVA_MAX_HEAP`、`HPA_MIN_REPLICAS` / `HPA_MAX_REPLICAS` / `HPA_CPU_THRESHOLD` / `HPA_MEMORY_THRESHOLD` / `HPA_SCALE_DOWN_WINDOW`
+
+### 凭据注入（统一口径）
+
+`CI_REGISTRY_USER` / `CI_REGISTRY_PASSWORD` 一律由**项目级 CI/CD 变量**注入：
+- 非-Harbor：推荐 `DOCKER_AUTH_CONFIG`（GitLab 自动注入 `~/.docker/config.json`）
+- Harbor：`CI_REGISTRY_USER` / `CI_REGISTRY_PASSWORD` 供 job 内 `docker login` 使用
+
 ## 🔄 流水线阶段
 
 ### 单体项目 (java-pipeline.yaml)
