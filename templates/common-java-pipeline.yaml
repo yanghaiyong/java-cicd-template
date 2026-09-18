@@ -30,7 +30,7 @@ variables:
   # ============================================
   # 统一镜像变量
   # ============================================
-  MAVEN_IMAGE: "maven:3.9.4-eclipse-temurin-17"
+  MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
   DOCKER_IMAGE: "docker:cli"
   KUBECTL_IMAGE: "bitnami/kubectl:latest"
   SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
@@ -50,6 +50,7 @@ variables:
   TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s /etc/maven/settings.xml'
   JUNIT_REPORT_PATH: 'target/surefire-reports/'
   JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
+  JACOCO_REPORT_DIR: 'target/site/jacoco/'
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
 
   # ============================================
@@ -70,7 +71,7 @@ variables:
   # ============================================
   # Docker 相关变量
   # ============================================
-  DOCKERFILE_PATH: 'Dockerfile'
+  DOCKERFILE_PATH: 'src/main/docker/Dockerfile'
   # DOCKER_AUTH_CONFIG 优先于 CI_REGISTRY_USER/PASSWORD（见 Docker 私服安装教程）
   # 如已配置 DOCKER_AUTH_CONFIG，以下两项可保持注释状态
   # CI_REGISTRY_USER: "admin"
