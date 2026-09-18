@@ -75,6 +75,7 @@
     expire_in: 7 days
     paths:
       - ${JUNIT_REPORT_PATH}
+      - ${JACOCO_REPORT_DIR}
     expose_as: "Test Report"
   cache:
     policy: pull-push
