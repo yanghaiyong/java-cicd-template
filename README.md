@@ -118,8 +118,8 @@ GitLab 内置变量可直接使用:
 | # | 变量 | `common-java-pipeline.yaml` | `java-pipeline-harbor.yaml` | 处置 | 说明 |
 |---|------|------------------------------|------------------------------|------|------|
 | 1 | `MAVEN_IMAGE` | `maven:3.9.6-eclipse-temurin-17` | 同左 | 统一 | Maven 版本影响 jar |
-| 2 | `BUILD_SHELL` | `-s /etc/maven/settings.xml` | `-s settings.xml` | **暂挂待议** | 内网 Nexus3 vs 项目自带(公网) |
-| 3 | `TEST_SHELL` | 同 #2 | 同 #2 | **暂挂待议** | 同上 |
+| 2 | `BUILD_SHELL` | `mvn clean package -B -DskipTests -f pom.xml -s /etc/maven/settings.xml` | 同左 | 统一 | Runner 挂载的内网 Nexus3(`/etc/maven/settings.xml`) |
+| 3 | `TEST_SHELL` | `mvn test jacoco:report -B -U -f pom.xml -s /etc/maven/settings.xml` | 同左 | 统一 | 同上 |
 | 4 | `DOCKER_IMAGE` | `docker:cli` | `docker:24`（job 级 `DOCKER_BUILDKIT=0`） | Harbor 专有 | classic builder；Docker 25+ 已移除 |
 | 5 | `KUBECTL_IMAGE` | `bitnami/kubectl:latest` | `docker.io/bitnamilegacy/kubectl:1.30.3` | 各自保留 | 公网 `bitnami/kubectl:1.30.x` tag 已 404 |
 | 6 | `DOCKERFILE_PATH` | `src/main/docker/Dockerfile` | 同左 | 统一 | 全项目目录约定 |
