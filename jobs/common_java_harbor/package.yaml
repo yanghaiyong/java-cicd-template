@@ -2,8 +2,7 @@
 # 单体 Java 项目 Maven 构建模板 (Harbor 版本)
 # ============================================
 # 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
-# 与 common_java/package.yaml 的区别:
-#   - 无变化, Maven 构建与镜像仓库无关
+# 与 common_java/package.yaml 结构一致(仅锚点名不同); Maven 构建与镜像仓库无关
 
 .mvn_build_harbor:
   stage: package
@@ -15,20 +14,43 @@
   before_script:
     - |
       echo "========================================="
-      echo "Maven 构建 (Harbor 模式)"
-      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "Maven 构建开始 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "默认目录: $HOME"
       echo "========================================="
-      java -version 2>&1 | head -1
-      mvn --version 2>&1 | head -1
-      mkdir -p .m2/repository
-  script:
-    - |
       echo "构建命令: $BUILD_SHELL"
-      $BUILD_SHELL
+      echo "Java 版本: $(java -version 2>&1 | head -1)"
+      echo "Maven 版本: $(mvn -version 2>&1 | head -1)"
+      mkdir -p .m2/repository
+      echo "工作目录: $(pwd)"
+      echo "磁盘空间: $(df -h . | tail -1)"
+      # ==========================================
+      # Nexus3 Maven 仓库集成（ConfigMap 方式）
+      # settings.xml 由 Runner 挂载：nexus-maven-settings → /etc/maven/settings.xml
+      # 所有 CI Job 自动使用，无需动态生成
+      # 如需回退到项目自带 settings.xml：
+      #   1. 把 BUILD_SHELL/TEST_SHELL 改回 -s settings.xml
+      #   2. 删除下方引用 /etc/maven 的检查即可
+      # ==========================================
+      if [ -f /etc/maven/settings.xml ]; then
+        echo "使用 Nexus3 统一配置: /etc/maven/settings.xml"
+        echo "Nexus 地址: $(grep -o '<url>[^<]*</url>' /etc/maven/settings.xml | head -1 | sed 's/<[^>]*>//g')"
+      else
+        # 原逻辑：使用项目自带的 settings.xml（未挂载 ConfigMap 时）
+        if [ ! -f settings.xml ]; then
+          echo "警告: 项目无 settings.xml 且未挂载 Nexus3 配置，使用 Maven 默认配置"
+        else
+          echo "使用项目自带 settings.xml"
+        fi
+      fi
+  script:
+    - $BUILD_SHELL
   after_script:
     - |
-      echo "构建产物:"
-      ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR"
+      echo "========================================="
+      echo "Maven 构建完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      ls -lh ${ARTIFACTS}*.jar 2>/dev/null || echo "未找到 JAR 文件"
+      ls -la $CACHE_DIR
   artifacts:
     name: '$ARTIFACTS_NAME'
     when: on_success

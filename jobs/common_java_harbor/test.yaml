@@ -1,9 +1,8 @@
 # ============================================
-# 单体 Java 项目测试模板 (Harbor 版本)
+# 单体 Java 项目测试模板 (Harbor 版本) - JaCoCo 覆盖率
 # ============================================
 # 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
-# 与 common_java/test.yaml 的区别:
-#   - 无变化, 测试与镜像仓库无关
+# 与 common_java/test.yaml 结构一致(仅锚点名不同); 测试与镜像仓库无关
 
 .test_harbor:
   stage: test
@@ -15,25 +14,71 @@
   before_script:
     - |
       echo "========================================="
-      echo "单元测试 (Harbor 模式)"
-      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "测试开始 - $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
-      mkdir -p .m2/repository
+      echo "测试命令: $TEST_SHELL"
+      echo "测试报告路径: $JUNIT_REPORT_PATH"
+      java -version 2>&1 | head -1
+      mvn -version 2>&1 | head -1
+      # ==========================================
+      # Nexus3 Maven 仓库集成（ConfigMap 方式，与 package.yaml 保持一致）
+      # settings.xml 由 Runner 挂载：nexus-maven-settings → /etc/maven/settings.xml
+      # 所有 CI Job 自动使用，无需动态生成
+      # 如需回退到项目自带 settings.xml：
+      #   1. 把 BUILD_SHELL/TEST_SHELL 改回 -s settings.xml
+      #   2. 删除下方引用 /etc/maven 的检查即可
+      # ==========================================
+      if [ -f /etc/maven/settings.xml ]; then
+        echo "使用 Nexus3 统一配置: /etc/maven/settings.xml"
+        echo "Nexus 地址: $(grep -o '<url>[^<]*</url>' /etc/maven/settings.xml | head -1 | sed 's/<[^>]*>//g')"
+      else
+        # 原逻辑：使用项目自带的 settings.xml（未挂载 ConfigMap 时）
+        if [ ! -f settings.xml ]; then
+          echo "警告: 项目无 settings.xml 且未挂载 Nexus3 配置，使用 Maven 默认配置"
+        else
+          echo "使用项目自带 settings.xml"
+        fi
+      fi
+      echo "========================================="
   script:
     - |
-      echo "测试命令: $TEST_SHELL"
+      echo "========================================="
+      echo "开始执行测试"
+      echo "========================================="
       $TEST_SHELL
+      TEST_RESULT=$?
+      echo "========================================="
+      if [ $TEST_RESULT -eq 0 ]; then
+        echo "测试通过 ✓"
+      else
+        echo "测试失败 ✗"
+        echo "========================================="
+        exit 1
+      fi
+  after_script:
+    - |
+      echo "========================================="
+      echo "测试完成 - $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "========================================="
+      echo "测试报告文件:"
+      if [ -d "$JUNIT_REPORT_PATH" ]; then
+        ls -la $JUNIT_REPORT_PATH || echo "报告目录为空"
+      else
+        echo "报告目录不存在: $JUNIT_REPORT_PATH"
+      fi
+      echo "========================================="
   artifacts:
-    when: always
-    expire_in: 7 days
     reports:
       junit: ${JUNIT_REPORT_PATH}TEST-*.xml
       coverage_report:
         coverage_format: jacoco
         path: ${JACOCO_REPORT_PATH}
+    when: always
+    expire_in: 7 days
     paths:
       - ${JUNIT_REPORT_PATH}
       - ${JACOCO_REPORT_DIR}
+    expose_as: "Test Report"
   cache:
     policy: pull-push
     key: "maven-${CI_COMMIT_REF_SLUG}"
