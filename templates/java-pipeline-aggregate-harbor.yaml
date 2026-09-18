@@ -67,7 +67,8 @@ variables:
   # 聚合项目 _all 变体的模块 glob(项目布局相关,可按项目覆盖)
   AGGREGATE_MODULES_GLOB: 'SpringBootStarry/Starry*'
 
-  # K8s 路径
+  # 名称 / K8s 路径
+  APP_NAME: "$CI_PROJECT_NAME"
   K8S_BASE_PATH: "src/main/k8s"
   K8S_FILE: "deploy.yaml"
 

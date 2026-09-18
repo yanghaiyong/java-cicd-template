@@ -85,6 +85,7 @@ variables:
   JACOCO_REPORT_PATH: 'target/site/jacoco/jacoco.xml'
   JACOCO_REPORT_DIR: 'target/site/jacoco/'
   AGGREGATE_MODULES_GLOB: 'SpringBootStarry/Starry*'
+  APP_NAME: "$CI_PROJECT_NAME"
   K8S_BASE_PATH: "src/main/k8s"
   K8S_FILE: "deploy.yaml"
   DOCKERFILE_PATH: "src/main/docker/Dockerfile"
