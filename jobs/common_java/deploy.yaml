@@ -170,4 +170,4 @@
       echo "Kubernetes 部署完成 - $(date +'%Y-%m-%d %H:%M:%S')"
   cache:
     policy: push
-  needs: ["package"]
+  needs: ["build"]
