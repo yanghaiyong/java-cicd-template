@@ -61,9 +61,9 @@ variables:
   CI_DEBUG_TRACE: "false"
   GIT_CHECKOUT: "true"
 
-  # 有意与 common-java-pipeline.yaml 不同: 用项目自带 settings.xml(公网),common_java 用内网 Nexus3
-  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
-  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+  # 与 common-java-pipeline.yaml 同名同值: 统一走 Runner 挂载的内网 Nexus3(/etc/maven/settings.xml)
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s /etc/maven/settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s /etc/maven/settings.xml'
 
   # 构建产物 / 测试报告
   CACHE_DIR: 'target/'
