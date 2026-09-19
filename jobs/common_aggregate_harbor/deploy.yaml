@@ -7,7 +7,7 @@
 #   - DOCKER_CONFIG 按项目级凭据生成 + 创建 Harbor imagePullSecret
 
 # 单 app K8s 部署模板 (matrix 中每个 job 单独调用)
-.aggregate_k8s_deploy_harbor:
+.aggregate_k8s_deploy:
   stage: deploy
   retry:
     max: 2
@@ -164,7 +164,7 @@
   needs: ["build"]
 
 # 全部 app 线性 K8s 部署模板 (顺序执行)
-.aggregate_k8s_deploy_all_harbor:
+.aggregate_k8s_deploy_all:
   stage: deploy
   retry:
     max: 2

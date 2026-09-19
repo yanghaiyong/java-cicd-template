@@ -53,6 +53,9 @@ variables:
   #   需要不同值请放到下方 [Harbor 专有] 段。
   # ============================================
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
+
+  # 统一镜像变量(与 java-pipeline-aggregate.yaml 同名同值, 与镜像仓库无关)
+  SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
   # 有意与 common-java-pipeline.yaml 不同: 用项目自带 settings.xml(公网),common_java 用内网 Nexus3
   BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
   TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
@@ -115,17 +118,18 @@ variables:
   IMAGE_PULL_SECRETS: "harbor-secret"
   CI_REGISTRY: "harbor-ui.test.com"
   CI_REGISTRY_IMAGE: "$CI_PROJECT_PATH_SLUG"
-  CI_REGISTRY_USER: ""
-  CI_REGISTRY_PASSWORD: ""
+  # 凭据统一由项目级 CI/CD 变量注入(project/group), 模板不设默认值
+  # CI_REGISTRY_USER: ""
+  # CI_REGISTRY_PASSWORD: ""
 
 # =============================================================================
 # 共享 changes 路径列表 (YAML anchor 复用)
 # =============================================================================
-.aggregate_change_paths_anchor_harbor:
+.aggregate_change_paths_anchor:
   stage: test
   tags: [placeholder]
   script: ["true"]
-  change_list: &aggregate_change_paths_harbor
+  change_list: &aggregate_change_paths
     - SpringBootStarry/StarryCommon/**/*
     - SpringBootStarry/StarryConfig/**/*
     - SpringBootStarry/StarryStarter/**/*
@@ -143,7 +147,7 @@ variables:
 # 阶段 1: 全项目编译验证
 # =============================================================================
 aggregate:compile:
-  extends: .aggregate_maven_compile_harbor
+  extends: .aggregate_maven_compile
   image: $MAVEN_IMAGE
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -154,7 +158,7 @@ aggregate:compile:
 # 阶段 2: 单元测试 (线性顺序)
 # =============================================================================
 aggregate:test:
-  extends: .aggregate_test_all_harbor
+  extends: .aggregate_test_all
   image: $MAVEN_IMAGE
   variables:
     DEPLOYABLE_APPS: >-
@@ -175,7 +179,7 @@ aggregate:test:
 # 阶段 3: Maven package (线性顺序)
 # =============================================================================
 aggregate:package:
-  extends: .aggregate_mvn_package_all_harbor
+  extends: .aggregate_mvn_package_all
   image: $MAVEN_IMAGE
   variables:
     DEPLOYABLE_APPS: >-
@@ -189,13 +193,13 @@ aggregate:package:
   needs: ["aggregate:compile"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
-      changes: *aggregate_change_paths_harbor
+      changes: *aggregate_change_paths
 
 # =============================================================================
 # 阶段 4: Docker 镜像构建 (线性顺序)
 # =============================================================================
 aggregate:build:
-  extends: .aggregate_docker_build_all_harbor
+  extends: .aggregate_docker_build_all
   image: $DOCKER_IMAGE
   variables:
     DEPLOYABLE_APPS: >-
@@ -209,13 +213,13 @@ aggregate:build:
   needs: ["aggregate:package", "aggregate:test"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
-      changes: *aggregate_change_paths_harbor
+      changes: *aggregate_change_paths
 
 # =============================================================================
 # 阶段 5: Trivy 镜像扫描 (线性顺序)
 # =============================================================================
 aggregate:scan:
-  extends: .aggregate_trivy_scan_all_harbor
+  extends: .aggregate_trivy_scan_all
   image: $DOCKER_IMAGE
   variables:
     DEPLOYABLE_APPS: >-
@@ -229,13 +233,13 @@ aggregate:scan:
   needs: ["aggregate:build"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
-      changes: *aggregate_change_paths_harbor
+      changes: *aggregate_change_paths
 
 # =============================================================================
 # 阶段 6: Kubernetes 部署 (线性顺序)
 # =============================================================================
 aggregate:deploy:
-  extends: .aggregate_k8s_deploy_all_harbor
+  extends: .aggregate_k8s_deploy_all
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
@@ -254,19 +258,19 @@ aggregate:deploy:
       variables:
         K8S_ENV: "dev"
         K8S_NAMESPACE: "app-dev"
-      changes: *aggregate_change_paths_harbor
+      changes: *aggregate_change_paths
     - if: '$CI_COMMIT_BRANCH == "test"'
       variables:
         K8S_ENV: "test"
         K8S_NAMESPACE: "app-test"
-      changes: *aggregate_change_paths_harbor
+      changes: *aggregate_change_paths
     - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"'
       variables:
         K8S_ENV: "pre-prod"
         K8S_NAMESPACE: "app-pre-prod"
-      changes: *aggregate_change_paths_harbor
+      changes: *aggregate_change_paths
     - if: '$CI_COMMIT_TAG'
       variables:
         K8S_ENV: "prod"
         K8S_NAMESPACE: "app-prod"
-      changes: *aggregate_change_paths_harbor
+      changes: *aggregate_change_paths

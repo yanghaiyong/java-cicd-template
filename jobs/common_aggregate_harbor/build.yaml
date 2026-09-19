@@ -7,7 +7,7 @@
 #   - 使用 DOCKER_AUTH_CONFIG 认证
 #   - 支持 Harbor TLS
 
-.aggregate_docker_build_harbor:
+.aggregate_docker_build:
   stage: build
   image: $DOCKER_IMAGE
   variables:
@@ -78,7 +78,7 @@
       fi
   needs: ["package"]
 
-.aggregate_docker_build_all_harbor:
+.aggregate_docker_build_all:
   stage: build
   image: $DOCKER_IMAGE
   variables:

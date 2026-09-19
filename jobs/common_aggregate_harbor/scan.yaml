@@ -3,7 +3,7 @@
 # ============================================
 # 适用场景: 聚合项目,使用 Harbor 镜像仓库
 
-.aggregate_trivy_scan_harbor:
+.aggregate_trivy_scan:
   stage: scan
   image: $DOCKER_IMAGE
   variables:
@@ -43,7 +43,7 @@
       echo "扫描完成"
   needs: ["build"]
 
-.aggregate_trivy_scan_all_harbor:
+.aggregate_trivy_scan_all:
   stage: scan
   image: $DOCKER_IMAGE
   variables:

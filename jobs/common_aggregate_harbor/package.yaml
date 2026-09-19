@@ -5,7 +5,7 @@
 # 与 common_aggregate/package.yaml 的区别:
 #   - 无变化, Maven 构建与镜像仓库无关
 
-.aggregate_mvn_package_harbor:
+.aggregate_mvn_package:
   stage: package
   retry:
     max: 2
@@ -48,7 +48,7 @@
       - .m2/repository
       - ${APP_MAVEN_PATH}/${CACHE_DIR}
 
-.aggregate_mvn_package_all_harbor:
+.aggregate_mvn_package_all:
   stage: package
   retry:
     max: 2
@@ -99,7 +99,7 @@
       - .m2/repository
       - ${AGGREGATE_MODULES_GLOB}/${CACHE_DIR}
 
-.aggregate_maven_compile_harbor:
+.aggregate_maven_compile:
   stage: package
   retry:
     max: 2

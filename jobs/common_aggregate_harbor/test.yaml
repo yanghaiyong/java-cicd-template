@@ -5,7 +5,7 @@
 # 与 common_aggregate/test.yaml 的区别:
 #   - 无变化, 测试与镜像仓库无关
 
-.aggregate_test_harbor:
+.aggregate_test:
   stage: test
   retry:
     max: 2
@@ -44,7 +44,7 @@
     paths:
       - .m2/repository
 
-.aggregate_test_all_harbor:
+.aggregate_test_all:
   stage: test
   retry:
     max: 2
