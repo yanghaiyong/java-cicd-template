@@ -39,9 +39,8 @@
   before_script:
     - |
       echo "========================================="
-      echo "聚合项目 K8s 部署 (Harbor 模式) - $APP_NAME"
+      echo "聚合项目 K8s 部署 - $APP_NAME"
       echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
-      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
       # 拼接 K8s YAML 路径: $APP_MAVEN_PATH/src/main/k8s/<env>/deploy.yaml
       export K8S_YAML="${APP_MAVEN_PATH}/${K8S_BASE_PATH}/${K8S_ENV}/${K8S_FILE}"
@@ -196,8 +195,7 @@
   before_script:
     - |
       echo "========================================="
-      echo "聚合项目 K8s 部署(线性) - Harbor 模式"
-      echo "App 列表: $DEPLOYABLE_APPS"
+      echo "聚合项目 K8s 部署(线性) - App 列表: $DEPLOYABLE_APPS"
       echo "环境: $K8S_ENV | Namespace: $K8S_NAMESPACE"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="

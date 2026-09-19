@@ -20,8 +20,7 @@
   before_script:
     - |
       echo "========================================="
-      echo "聚合项目测试 (Harbor 模式) - $APP_NAME"
-      echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
+      echo "聚合项目测试 - $APP_NAME"
       echo "========================================="
       mkdir -p .m2/repository
   script:
@@ -40,7 +39,7 @@
       - ${APP_MAVEN_PATH}/${JACOCO_REPORT_DIR}
   cache:
     policy: pull-push
-    key: "maven-aggregate-$CI_COMMIT_REF_SLUG"
+    key: "maven-aggregate-${CI_COMMIT_REF_SLUG}"
     paths:
       - .m2/repository
 
@@ -59,8 +58,7 @@
   before_script:
     - |
       echo "========================================="
-      echo "聚合项目测试(线性) - Harbor 模式"
-      echo "App 列表: $DEPLOYABLE_APPS"
+      echo "聚合项目测试(线性) - App 列表: $DEPLOYABLE_APPS"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
       java -version 2>&1 | head -1

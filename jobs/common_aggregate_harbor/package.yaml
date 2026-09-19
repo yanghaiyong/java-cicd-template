@@ -20,13 +20,14 @@
   before_script:
     - |
       echo "========================================="
-      echo "聚合项目 Maven 构建 (Harbor 模式) - $APP_NAME"
+      echo "聚合项目 Maven 构建 - $APP_NAME"
       echo "Maven 模块路径: $APP_MAVEN_PATH"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
       java -version 2>&1 | head -1
       mvn --version 2>&1 | head -1
       mkdir -p .m2/repository
+      echo "工作目录: $(pwd)"
   script:
     - |
       echo "构建模块: $APP_MAVEN_PATH"
@@ -63,7 +64,7 @@
   before_script:
     - |
       echo "========================================="
-      echo "聚合项目 Maven 全部构建(线性) - Harbor 模式"
+      echo "聚合项目 Maven 全部构建(线性)"
       echo "App 列表: $DEPLOYABLE_APPS"
       echo "时间: $(date +'%Y-%m-%d %H:%M:%S')"
       echo "========================================="
@@ -86,6 +87,7 @@
       echo "========================================="
       echo "全部构建完成!"
       echo "========================================="
+  # artifacts 必须声明,否则 aggregate:build 拿不到 JAR(Dockerfile COPY target/*.jar 会失败)
   artifacts:
     name: "maven-aggregate-$CI_COMMIT_REF_SLUG"
     when: on_success
@@ -115,7 +117,7 @@
     - mkdir -p .m2/repository
   script:
     - |
-      echo "全项目编译验证 (Harbor 模式)"
+      echo "全项目编译验证"
       mvn compile -B -ntp -T 1C \
         -DskipTests \
         -Dcheckstyle.skip=true \
