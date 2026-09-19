@@ -123,7 +123,7 @@
         -Dcheckstyle.skip=true \
         -Dmaven.javadoc.skip=true \
         -Dmaven.repo.local=.m2/repository \
-        -f pom.xml -s settings.xml
+        -f pom.xml -s /etc/maven/settings.xml
   cache:
     policy: pull-push
     key: "maven-aggregate-$CI_COMMIT_REF_SLUG"

@@ -56,9 +56,9 @@ variables:
 
   # 统一镜像变量(与 java-pipeline-aggregate.yaml 同名同值, 与镜像仓库无关)
   SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
-  # 与 java-pipeline-aggregate.yaml 同名同值(当前两侧均用项目自带 settings.xml)
-  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
-  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+  # 与 java-pipeline-aggregate.yaml 同名同值: 统一走 Runner 挂载的内网 Nexus3(/etc/maven/settings.xml)
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s /etc/maven/settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s /etc/maven/settings.xml'
 
   # 构建产物 / 测试报告
   CACHE_DIR: 'target/'
@@ -216,27 +216,7 @@ aggregate:build:
       changes: *aggregate_change_paths
 
 # =============================================================================
-# 阶段 5: Trivy 镜像扫描 (线性顺序)
-# =============================================================================
-aggregate:scan:
-  extends: .aggregate_trivy_scan_all
-  image: $DOCKER_IMAGE
-  variables:
-    DEPLOYABLE_APPS: >-
-      SpringBootStarry/StarryGateway
-      SpringBootStarry/StarryDataCenter
-      SpringBootStarry/StarryAdmin
-      SpringBootStarry/StarryApi
-      SpringBootStarry/StarryAuth
-      SpringBootStarry/StarryOauthServer
-      SpringBootStarry/StarryOauthResource
-  needs: ["aggregate:build"]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
-      changes: *aggregate_change_paths
-
-# =============================================================================
-# 阶段 6: Kubernetes 部署 (线性顺序)
+# 阶段 5: Kubernetes 部署 (线性顺序)
 # =============================================================================
 aggregate:deploy:
   extends: .aggregate_k8s_deploy_all

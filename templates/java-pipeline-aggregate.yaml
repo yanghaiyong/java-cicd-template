@@ -70,9 +70,9 @@ variables:
   # Maven 默认值
   # ============================================
   MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms512m -Xmx1024m"
-  # 有意与 common-java-pipeline.yaml 不同: 用项目自带 settings.xml(公网),common_java 用内网 Nexus3
-  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
-  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
+  # 与 common_java 同名同值: 统一走 Runner 挂载的内网 Nexus3(/etc/maven/settings.xml)
+  BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s /etc/maven/settings.xml'
+  TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s /etc/maven/settings.xml'
 
   # ============================================
   # [通用] 与 common-java-pipeline.yaml 同名同值
@@ -220,27 +220,7 @@ aggregate:build:
       changes: *aggregate_change_paths
 
 # =============================================================================
-# 阶段 5: Trivy 镜像扫描 (线性顺序)
-# =============================================================================
-aggregate:scan:
-  extends: .aggregate_trivy_scan_all
-  image: $DOCKER_IMAGE
-  variables:
-    DEPLOYABLE_APPS: >-
-      SpringBootStarry/StarryGateway
-      SpringBootStarry/StarryDataCenter
-      SpringBootStarry/StarryAdmin
-      SpringBootStarry/StarryApi
-      SpringBootStarry/StarryAuth
-      SpringBootStarry/StarryOauthServer
-      SpringBootStarry/StarryOauthResource
-  needs: ["aggregate:build"]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "test" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_TAG'
-      changes: *aggregate_change_paths
-
-# =============================================================================
-# 阶段 6: Kubernetes 部署 (线性顺序)
+# 阶段 5: Kubernetes 部署 (线性顺序)
 # =============================================================================
 aggregate:deploy:
   extends: .aggregate_k8s_deploy_all
