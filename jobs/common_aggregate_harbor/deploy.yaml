@@ -298,7 +298,16 @@
 
         # 部署
         if kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}; then
-          echo "✓ 部署成功: $app_name"
+          echo "已提交部署,等待就绪: $app_name (${app_name_lower})"
+          if kubectl rollout status deployment/${app_name_lower} -n ${K8S_NAMESPACE} --timeout=300s; then
+            echo "✓ 部署成功: $app_name"
+          else
+            echo "✗ 部署失败(rollout 未就绪): $app_name"
+            kubectl describe deployment/${app_name_lower} -n ${K8S_NAMESPACE} | tail -30
+            kubectl get pods -n ${K8S_NAMESPACE} -l app=${app_name_lower} -o wide
+            kubectl get events -n ${K8S_NAMESPACE} --sort-by=.lastTimestamp | tail -20
+            failed_apps="$failed_apps $app_name"
+          fi
         else
           echo "✗ 部署失败: $app_name"
           failed_apps="$failed_apps $app_name"
