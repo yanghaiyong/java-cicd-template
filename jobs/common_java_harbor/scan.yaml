@@ -59,4 +59,3 @@
         --exit-code 0 \
         "$CI_REGISTRY_FULL_IMAGE"
       echo "扫描完成"
-  needs: ["build"]
