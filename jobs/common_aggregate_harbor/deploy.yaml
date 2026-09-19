@@ -303,9 +303,9 @@
             echo "✓ 部署成功: $app_name"
           else
             echo "✗ 部署失败(rollout 未就绪): $app_name"
-            kubectl describe deployment/${app_name_lower} -n ${K8S_NAMESPACE} | tail -30
-            kubectl get pods -n ${K8S_NAMESPACE} -l app=${app_name_lower} -o wide
-            kubectl get events -n ${K8S_NAMESPACE} --sort-by=.lastTimestamp | tail -20
+            kubectl describe deployment/${app_name_lower} -n ${K8S_NAMESPACE} 2>&1 | tail -30 || true
+            kubectl get pods -n ${K8S_NAMESPACE} -l app=${app_name_lower} -o wide 2>&1 || true
+            kubectl get events -n ${K8S_NAMESPACE} --sort-by=.lastTimestamp 2>&1 | tail -20 || true
             failed_apps="$failed_apps $app_name"
           fi
         else
