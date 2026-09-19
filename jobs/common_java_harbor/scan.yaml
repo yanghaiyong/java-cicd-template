@@ -9,6 +9,9 @@
   image: $TRIVY_IMAGE
   variables:
     DOCKER_CONFIG: /tmp/docker-config
+    # 离线环境: 漏洞库经 daocloud 代理拉取(集群不可直连 ghcr.io / mirror.gcr.io)
+    TRIVY_DB_REPOSITORY: docker.m.daocloud.io/aquasec/trivy-db:2
+    TRIVY_JAVA_DB_REPOSITORY: docker.m.daocloud.io/aquasec/trivy-java-db:1
   retry:
     max: 2
     when:
@@ -32,6 +35,12 @@
         echo "Harbor 认证已配置"
       else
         echo "警告: 未配置 DOCKER_AUTH_CONFIG, 扫描可能失败"
+      fi
+      # Trivy(Go) 走系统信任库, 不读 /etc/docker/certs.d → 把 Harbor CA 并入系统 CA bundle
+      if [ -f "/etc/docker/certs.d/$CI_REGISTRY/ca.crt" ] && [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+        cat /etc/ssl/certs/ca-certificates.crt "/etc/docker/certs.d/$CI_REGISTRY/ca.crt" > /tmp/ca-bundle.crt
+        export SSL_CERT_FILE=/tmp/ca-bundle.crt
+        echo "已并入 Harbor CA 到信任库"
       fi
   script:
     - |
