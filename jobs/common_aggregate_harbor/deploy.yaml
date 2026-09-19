@@ -72,6 +72,8 @@
       CI_REGISTRY_IMAGE_FULL="$CI_REGISTRY_IMAGE/$APP_NAME"
       CI_REGISTRY_FULL_IMAGE="$CI_REGISTRY/$CI_REGISTRY_IMAGE_FULL:$IMAGE_TAG"
       echo "部署镜像: $CI_REGISTRY_FULL_IMAGE"
+      # K8s 资源名必须全小写(RFC1123)
+      APP_NAME_LOWER=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')
 
       # ${IMAGE_PULL_SECRETS} 由模板变量提供; ${DOCKER_CONFIG} 按 Harbor 凭据在此生成
       DOCKER_CONFIG=$(printf '{"auths":{"%s":{"username":"%s","password":"%s","auth":"%s"}}}' \
@@ -101,7 +103,7 @@
         sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
         sed -i "s|\${DOCKER_CONFIG}|$DOCKER_CONFIG|g" $K8S_YAML
       fi
-      sed -i "s|\${APP_NAME}|$APP_NAME|g" $K8S_YAML
+      sed -i "s|\${APP_NAME}|$APP_NAME_LOWER|g" $K8S_YAML
       sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
       sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
       sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" $K8S_YAML
@@ -143,12 +145,12 @@
       # 部署
       if kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}; then
         echo "部署成功,等待就绪..."
-        if kubectl rollout status deployment/${APP_NAME} -n ${K8S_NAMESPACE} --timeout=300s; then
+        if kubectl rollout status deployment/${APP_NAME_LOWER} -n ${K8S_NAMESPACE} --timeout=300s; then
           echo "应用已就绪"
         else
           echo "部署失败: rollout 未就绪,输出诊断信息"
-          kubectl describe deployment/${APP_NAME} -n ${K8S_NAMESPACE} | tail -30
-          kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME} -o wide
+          kubectl describe deployment/${APP_NAME_LOWER} -n ${K8S_NAMESPACE} | tail -30
+          kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME_LOWER} -o wide
           kubectl get events -n ${K8S_NAMESPACE} --sort-by=.lastTimestamp | tail -20
           exit 1
         fi
@@ -159,7 +161,7 @@
 
       echo "部署完成!"
       kubectl get deployments -n ${K8S_NAMESPACE}
-      kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME}
+      kubectl get pods -n ${K8S_NAMESPACE} -l app=${APP_NAME_LOWER}
   needs: ["build"]
 
 # 全部 app 线性 K8s 部署模板 (顺序执行)
@@ -268,7 +270,7 @@
           sed -i "s|\${IMAGE_PULL_SECRETS}|$IMAGE_PULL_SECRETS|g" $K8S_YAML
           sed -i "s|\${DOCKER_CONFIG}|$DOCKER_CONFIG|g" $K8S_YAML
         fi
-        sed -i "s|\${APP_NAME}|$app_name|g" $K8S_YAML
+        sed -i "s|\${APP_NAME}|$app_name_lower|g" $K8S_YAML
         sed -i "s|\${K8S_NAMESPACE}|$K8S_NAMESPACE|g" $K8S_YAML
         sed -i "s|\${CI_REGISTRY_FULL_IMAGE}|$CI_REGISTRY_FULL_IMAGE|g" $K8S_YAML
         sed -i "s|\${IMAGE_TAG}|$IMAGE_TAG|g" $K8S_YAML
