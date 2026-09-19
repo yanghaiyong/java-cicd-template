@@ -17,7 +17,12 @@
     max: 2
     when:
       - runner_system_failure
-      - stuck_or_timeout_failure
+      - stuck_pending_with_matching_runners
+      - stuck_pending_no_matching_runners
+      - no_updates_running
+      - no_updates_canceling
+      - server_timeout_running
+      - server_timeout_canceling
   # 多环境自动分支识别 (与 common_java/deploy.yaml 一致)
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
@@ -155,7 +160,12 @@
     max: 2
     when:
       - runner_system_failure
-      - stuck_or_timeout_failure
+      - stuck_pending_with_matching_runners
+      - stuck_pending_no_matching_runners
+      - no_updates_running
+      - no_updates_canceling
+      - server_timeout_running
+      - server_timeout_canceling
   # 多环境自动分支识别 (与 common_java/deploy.yaml 一致)
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
