@@ -3,10 +3,12 @@
 # ============================================
 # 基于分支自动识别环境：develop -> test -> master -> tag
 #
-# 使用方式：
+# 使用方式:
 #   在项目 .gitlab-ci.yml 中:
 #   include:
-#     - template: common-java-pipeline.yaml
+#     - project: 'cidevops/java-cicd-template'
+#       ref: master
+#       file: 'templates/common-java-pipeline.yaml'
 # ============================================
 
 include:

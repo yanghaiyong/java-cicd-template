@@ -1,11 +1,12 @@
 # ============================================
 # 通用 Java 单体项目 CI/CD 流水线模板 (Harbor 版本)
 # ============================================
-# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库 + containerd
-# 与 java-pipeline.yaml 的区别:
-#   - 使用 BuildKit daemonless 构建镜像 (无需 Docker daemon)
+# 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
+# 与 common-java-pipeline.yaml 的区别:
 #   - 镜像仓库: Harbor (harbor-ui.test.com)
-#   - 凭据通过 DOCKER_AUTH_CONFIG 环境变量注入
+#   - 构建: DinD service + classic builder (DOCKER_BUILDKIT=0), 需 docker daemon
+#   - 凭据: 项目级 CI_REGISTRY_USER/PASSWORD → job 内 docker login
+#   - 其余变量与 common-java-pipeline.yaml 同名同值 (见 README 变量契约)
 #
 # 使用方式:
 #   .gitlab-ci.yml:
