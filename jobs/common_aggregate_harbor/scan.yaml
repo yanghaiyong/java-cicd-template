@@ -6,8 +6,6 @@
 .aggregate_trivy_scan_harbor:
   stage: scan
   image: $DOCKER_IMAGE
-  services:
-    - $DOCKER_IMAGE
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
@@ -48,8 +46,6 @@
 .aggregate_trivy_scan_all_harbor:
   stage: scan
   image: $DOCKER_IMAGE
-  services:
-    - $DOCKER_IMAGE
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
