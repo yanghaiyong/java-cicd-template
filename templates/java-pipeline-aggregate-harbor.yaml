@@ -3,7 +3,7 @@
 # ============================================
 # 适用场景: Maven 多模块聚合项目,使用 Harbor 镜像仓库 + containerd
 # 与 java-pipeline-aggregate.yaml 的区别:
-#   - 使用 Docker-in-Docker (dind) 构建镜像 (containerd 环境兼容)
+#   - 使用 DinD service + classic builder (DOCKER_BUILDKIT=0) 构建镜像 (containerd 环境)
 #   - 镜像仓库: Harbor (harbor-ui.test.com)
 #   - 凭据在 GitLab CI/CD Variables 中配置
 #
@@ -48,7 +48,7 @@ stages:
 
 variables:
   # ============================================
-  # [通用] 与 common-java-pipeline.yaml 同族同名同值
+  # [通用] 与 java-pipeline-aggregate.yaml 同族同名同值
   #   本段只放与镜像仓库无关的变量;同名同值是刻意约定,
   #   需要不同值请放到下方 [Harbor 专有] 段。
   # ============================================
@@ -56,7 +56,7 @@ variables:
 
   # 统一镜像变量(与 java-pipeline-aggregate.yaml 同名同值, 与镜像仓库无关)
   SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
-  # 有意与 common-java-pipeline.yaml 不同: 用项目自带 settings.xml(公网),common_java 用内网 Nexus3
+  # 与 java-pipeline-aggregate.yaml 同名同值(当前两侧均用项目自带 settings.xml)
   BUILD_SHELL: 'mvn clean package -B -DskipTests -f pom.xml -s settings.xml'
   TEST_SHELL: 'mvn test jacoco:report -B -U -f pom.xml -s settings.xml'
 
