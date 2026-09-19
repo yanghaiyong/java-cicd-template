@@ -152,13 +152,11 @@ test:
   stage: test
   extends: .test
   image: $MAVEN_IMAGE
-  needs: ["package"]
 
 build:
   stage: build
   extends: .docker_build
   image: $DOCKER_IMAGE
-  needs: ["package"]
 
 deploy:
   stage: deploy
@@ -166,5 +164,4 @@ deploy:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  needs: ["build"]
 

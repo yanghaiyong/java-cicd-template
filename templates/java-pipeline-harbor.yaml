@@ -156,7 +156,6 @@ test:
   stage: test
   extends: .test
   image: $MAVEN_IMAGE
-  needs: ["package"]
 
 # =============================================================================
 # 阶段 3: Docker 镜像构建
@@ -165,7 +164,6 @@ build:
   stage: build
   extends: .docker_build
   image: $DOCKER_IMAGE
-  needs: ["package"]
 
 # =============================================================================
 # 阶段 4: Trivy 镜像扫描
@@ -174,7 +172,6 @@ scan:
   stage: scan
   extends: .trivy_scan_harbor
   image: $TRIVY_IMAGE
-  needs: ["build"]
 
 # =============================================================================
 # 阶段 5: Kubernetes 部署
@@ -185,4 +182,3 @@ deploy:
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]
-  needs: ["build"]
