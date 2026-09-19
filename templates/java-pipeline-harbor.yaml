@@ -145,7 +145,7 @@ cache:
 # =============================================================================
 package:
   stage: package
-  extends: .mvn_build_harbor
+  extends: .mvn_package
   image: $MAVEN_IMAGE
 
 # =============================================================================
@@ -153,7 +153,7 @@ package:
 # =============================================================================
 test:
   stage: test
-  extends: .test_harbor
+  extends: .test
   image: $MAVEN_IMAGE
   needs: ["package"]
 
@@ -162,7 +162,7 @@ test:
 # =============================================================================
 build:
   stage: build
-  extends: .docker_build_harbor
+  extends: .docker_build
   image: $DOCKER_IMAGE
   needs: ["package"]
 
@@ -171,7 +171,7 @@ build:
 # =============================================================================
 deploy:
   stage: deploy
-  extends: .k8s_deploy_harbor
+  extends: .k8s_deploy
   image:
     name: $KUBECTL_IMAGE
     entrypoint: [ "" ]

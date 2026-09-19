@@ -2,9 +2,9 @@
 # 单体 Java 项目 Maven 构建模板 (Harbor 版本)
 # ============================================
 # 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
-# 与 common_java/package.yaml 结构一致(仅锚点名不同); Maven 构建与镜像仓库无关
+# 与 common_java/package.yaml 结构一致; Maven 构建与镜像仓库无关
 
-.mvn_build_harbor:
+.mvn_package:
   stage: package
   retry:
     max: 2

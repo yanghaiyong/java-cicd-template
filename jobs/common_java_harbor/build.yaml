@@ -7,7 +7,7 @@
 #     docker:24 的 BuildKit 不读 certs.d/系统信任库, 必须使用 classic builder
 #   - docker login(凭据由项目级 CI/CD 变量注入)
 
-.docker_build_harbor:
+.docker_build:
   stage: build
   when: on_success
   retry:

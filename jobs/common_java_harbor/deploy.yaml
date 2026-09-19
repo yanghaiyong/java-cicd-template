@@ -5,7 +5,7 @@
 #   - 镜像路径: $CI_REGISTRY/$CI_REGISTRY_IMAGE:$TAG
 #   - DOCKER_CONFIG 按项目级凭据生成 + 创建 Harbor imagePullSecret
 
-.k8s_deploy_harbor:
+.k8s_deploy:
   stage: deploy
   when: on_success
   retry:

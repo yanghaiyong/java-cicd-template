@@ -2,9 +2,9 @@
 # 单体 Java 项目测试模板 (Harbor 版本) - JaCoCo 覆盖率
 # ============================================
 # 适用场景: 单体 Java 项目,使用 Harbor 镜像仓库
-# 与 common_java/test.yaml 结构一致(仅锚点名不同); 测试与镜像仓库无关
+# 与 common_java/test.yaml 结构一致; 测试与镜像仓库无关
 
-.test_harbor:
+.test:
   stage: test
   retry:
     max: 2
