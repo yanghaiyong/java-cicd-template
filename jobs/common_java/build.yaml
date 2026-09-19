@@ -45,7 +45,6 @@
       echo "========================================="
       
       # Docker 认证：DOCKER_AUTH_CONFIG 由 GitLab CI 自动注入 ~/.docker/config.json
-      # docker login 已弃用，改用 DOCKER_AUTH_CONFIG（见 Docker 私服安装教程）
       if [ -z "$DOCKER_AUTH_CONFIG" ]; then
         echo "警告: 未配置 DOCKER_AUTH_CONFIG，docker push 可能失败"
       fi
@@ -94,7 +93,6 @@
       fi
       
       echo "清理本地镜像: $CI_REGISTRY_FULL_IMAGE"
-      #docker rmi -f $CI_REGISTRY_FULL_IMAGE || true
   after_script:
     - |
       echo "========================================="
