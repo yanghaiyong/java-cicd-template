@@ -100,4 +100,3 @@
       echo "========================================="
   cache:
     policy: push
-  needs: ["package"]
