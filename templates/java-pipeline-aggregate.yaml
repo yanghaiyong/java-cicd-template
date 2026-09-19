@@ -56,8 +56,8 @@ variables:
   # 镜像变量 (与 common_java 一致)
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
-  DOCKER_IMAGE: "docker:24.0.7-dind"
-  KUBECTL_IMAGE: "bitnami/kubectl:1.30"
+  DOCKER_IMAGE: "docker:24"
+  KUBECTL_IMAGE: "docker.io/bitnamilegacy/kubectl:1.30.3"
   SKYWALKING_AGENT_IMAGE: "apache/skywalking-java-agent:9.6.0-java17"
 
   # ============================================

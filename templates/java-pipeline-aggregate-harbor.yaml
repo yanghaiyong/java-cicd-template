@@ -112,8 +112,8 @@ variables:
   # [Harbor 专有] 需特殊值,勿与 common-java-pipeline.yaml 直接对齐
   # ============================================
   MAVEN_IMAGE: "maven:3.9.6-eclipse-temurin-17"
-  DOCKER_IMAGE: "docker:24.0.7-dind"
-  KUBECTL_IMAGE: "bitnami/kubectl:1.30"
+  DOCKER_IMAGE: "docker:24"
+  KUBECTL_IMAGE: "docker.io/bitnamilegacy/kubectl:1.30.3"
   DOCKERFILE_PATH: "src/main/docker/Dockerfile"
   IMAGE_PULL_SECRETS: "harbor-secret"
   CI_REGISTRY: "harbor-ui.test.com"
