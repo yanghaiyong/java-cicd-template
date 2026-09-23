@@ -128,6 +128,7 @@
       sed -i "s|\${HPA_SCALE_DOWN_WINDOW}|$HPA_SCALE_DOWN_WINDOW|g" $K8S_YAML
       sed -i "s|\${JAVA_MIN_HEAP}|$JAVA_MIN_HEAP|g" $K8S_YAML
       sed -i "s|\${JAVA_MAX_HEAP}|$JAVA_MAX_HEAP|g" $K8S_YAML
+        sed -i "s|\${SKYWALKING_AGENT_IMAGE}|${SKYWALKING_AGENT_IMAGE:-apache/skywalking-java-agent:9.6.0-java17}|g" $K8S_YAML
 
       # dry-run 验证 YAML 语法
       echo "验证 YAML 语法..."
@@ -295,6 +296,7 @@
         sed -i "s|\${HPA_SCALE_DOWN_WINDOW}|$HPA_SCALE_DOWN_WINDOW|g" $K8S_YAML
         sed -i "s|\${JAVA_MIN_HEAP}|$JAVA_MIN_HEAP|g" $K8S_YAML
         sed -i "s|\${JAVA_MAX_HEAP}|$JAVA_MAX_HEAP|g" $K8S_YAML
+        sed -i "s|\${SKYWALKING_AGENT_IMAGE}|${SKYWALKING_AGENT_IMAGE:-apache/skywalking-java-agent:9.6.0-java17}|g" $K8S_YAML
 
         # 部署
         if kubectl apply -f $K8S_YAML -n ${K8S_NAMESPACE}; then
