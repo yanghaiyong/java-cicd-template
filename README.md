@@ -2,6 +2,11 @@
 
 一个开箱即用的 Java 项目 CI/CD 标准模板，基于 GitLab CI/CD 设计，支持 Maven 构建、Docker 镜像构建和 Kubernetes 部署。
 
+> **[2026-09-24] 已统一为 Harbor 模板。** 非 Harbor 资产已移入 `archive/`：
+> `jobs/common_java`、`jobs/common_aggregate`、`templates/common-java-pipeline.yaml`、
+> `templates/java-pipeline-aggregate.yaml`、`templates/java-pipeline.yaml`（及其根 `jobs/*.yaml`）。
+> 新项目一律使用 **`templates/java-pipeline-harbor.yaml`**（单体）或 **`templates/java-pipeline-aggregate-harbor.yaml`**（聚合）。
+
 ## 📁 目录结构
 
 ```
